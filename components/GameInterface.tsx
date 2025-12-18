@@ -32,11 +32,47 @@ const GameInterface: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isMuted, setIsMuted] = useState(false);
 
+    const LEVEL_STORAGE_KEY = 'chronicles:selectedLevel';
+    const OBJECTIVE_STORAGE_KEY = 'chronicles:objectives';
+
     useEffect(() => {
         if (!selectedLevel && levels[0]) {
             setSelectedLevelId(levels[0].id);
         }
     }, [levels, selectedLevel]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const storedLevelId = window.localStorage.getItem(LEVEL_STORAGE_KEY);
+        if (storedLevelId && levels.some((level) => level.id === storedLevelId)) {
+            setSelectedLevelId(storedLevelId);
+        }
+
+        const storedObjectives = window.localStorage.getItem(OBJECTIVE_STORAGE_KEY);
+        if (!storedObjectives) return;
+
+        try {
+            const parsed = JSON.parse(storedObjectives) as Record<string, Record<string, boolean>>;
+            setObjectiveProgress((prev) => {
+                const next: Record<string, Record<string, boolean>> = { ...prev };
+                levels.forEach((level) => {
+                    const savedLevel = parsed[level.id];
+                    if (!savedLevel) return;
+                    const sanitized: Record<string, boolean> = { ...next[level.id] };
+                    level.objectives.forEach((objective) => {
+                        if (typeof savedLevel[objective.id] === 'boolean') {
+                            sanitized[objective.id] = savedLevel[objective.id];
+                        }
+                    });
+                    next[level.id] = sanitized;
+                });
+                return next;
+            });
+        } catch (err) {
+            console.warn('Falha ao carregar progresso dos objetivos.', err);
+        }
+    }, [LEVEL_STORAGE_KEY, OBJECTIVE_STORAGE_KEY, levels]);
 
     useEffect(() => {
         setObjectiveProgress((prev) => {
@@ -71,6 +107,16 @@ const GameInterface: React.FC = () => {
             return mutated ? next : prev;
         });
     }, [levels]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !selectedLevelId) return;
+        window.localStorage.setItem(LEVEL_STORAGE_KEY, selectedLevelId);
+    }, [LEVEL_STORAGE_KEY, selectedLevelId]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(OBJECTIVE_STORAGE_KEY, JSON.stringify(objectiveProgress));
+    }, [OBJECTIVE_STORAGE_KEY, objectiveProgress]);
 
   useEffect(() => {
     service.onStateChange = setConnectionState;

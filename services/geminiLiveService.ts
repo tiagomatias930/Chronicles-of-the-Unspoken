@@ -1,7 +1,43 @@
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from '@google/genai';
 import { ConnectionState } from '../types';
 import { SYSTEM_INSTRUCTION, GEMINI_MODEL, INPUT_SAMPLE_RATE, AUDIO_SAMPLE_RATE } from '../constants';
 import { base64ToBytes, bytesToBase64, decodeAudioData, float32To16BitPCM } from './audioUtils';
+
+// Tool Definition: Bomb State Update
+const updateBombStateTool: FunctionDeclaration = {
+  name: 'updateBombState',
+  description: 'Update the status of the bomb defusal operation based on visual analysis.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      status: {
+        type: Type.STRING,
+        enum: ['active', 'exploded', 'defused'],
+        description: 'Current state of the bomb.',
+      },
+      message: {
+        type: Type.STRING,
+        description: 'Urgent instruction for the player displayed on the HUD.',
+      },
+      stability: {
+        type: Type.NUMBER,
+        description: 'Bomb stability percentage (0-100). Low stability risks detonation.',
+      },
+      timePenalty: {
+        type: Type.NUMBER,
+        description: 'Seconds to deduct from the timer as penalty for mistakes.',
+      },
+    },
+    required: ['status', 'message', 'stability'],
+  },
+};
+
+export interface BombState {
+    status: 'active' | 'exploded' | 'defused';
+    message: string;
+    stability: number;
+    timePenalty?: number;
+}
 
 export class GeminiLiveService {
   private client: GoogleGenAI;
@@ -19,6 +55,7 @@ export class GeminiLiveService {
   public onStateChange: (state: ConnectionState) => void = () => {};
   public onError: (error: string) => void = () => {};
   public onUserSpeaking: () => void = () => {};
+  public onBombUpdate: (state: BombState) => void = () => {};
 
   constructor() {
     this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -62,8 +99,10 @@ export class GeminiLiveService {
         model: GEMINI_MODEL,
         config: {
           responseModalities: [Modality.AUDIO],
+          tools: [{ functionDeclarations: [updateBombStateTool] }],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }, // Deep, mysterious voice
+            // 'Kore' is higher pitched, good for panic/stress
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }, 
           },
           systemInstruction: SYSTEM_INSTRUCTION,
         },
@@ -98,30 +137,20 @@ export class GeminiLiveService {
     if (!this.inputAudioContext || !this.stream) return;
 
     this.inputSource = this.inputAudioContext.createMediaStreamSource(this.stream);
-    // Use ScriptProcessor for raw PCM access (bufferSize: 4096, 1 input channel, 1 output channel)
     this.audioScriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
 
     this.audioScriptProcessor.onaudioprocess = (e) => {
-      const inputData = e.inputBuffer.getChannelData(0); // Float32Array
+      const inputData = e.inputBuffer.getChannelData(0);
       
-      // Calculate RMS to detect user speech activity
       let sum = 0;
-      for (let i = 0; i < inputData.length; i++) {
-        sum += inputData[i] * inputData[i];
-      }
+      for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
       const rms = Math.sqrt(sum / inputData.length);
-      // Threshold 0.02 is arbitrary but works well for general speech detection
-      if (rms > 0.02) {
-        this.onUserSpeaking();
-      }
+      if (rms > 0.02) this.onUserSpeaking();
 
-      // Convert to 16-bit PCM for Gemini
       const pcm16 = float32To16BitPCM(inputData);
       const uint8Buffer = new Uint8Array(pcm16);
-      
       const base64Data = bytesToBase64(uint8Buffer);
 
-      // Send to Gemini
       if (this.sessionPromise) {
         this.sessionPromise.then((session) => {
           session.sendRealtimeInput({
@@ -135,33 +164,24 @@ export class GeminiLiveService {
     };
 
     this.inputSource.connect(this.audioScriptProcessor);
-    this.audioScriptProcessor.connect(this.inputAudioContext.destination); // Required for script processor to run
+    this.audioScriptProcessor.connect(this.inputAudioContext.destination);
   }
 
   private startVideoInput(videoElement: HTMLVideoElement) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
-    // Send frames at ~2 FPS to allow emotion analysis without overwhelming bandwidth
-    // Gemini Live is optimized for audio; video is auxiliary context.
-    const FPS = 2; 
+    const FPS = 2; // Need frequent updates for wire detection
 
     this.videoInterval = window.setInterval(async () => {
       if (!ctx || !videoElement.videoWidth) return;
-
       canvas.width = videoElement.videoWidth;
       canvas.height = videoElement.videoHeight;
       ctx.drawImage(videoElement, 0, 0);
-
       const base64Image = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-
       if (this.sessionPromise) {
         this.sessionPromise.then((session) => {
             session.sendRealtimeInput({
-                media: {
-                    mimeType: 'image/jpeg',
-                    data: base64Image
-                }
+                media: { mimeType: 'image/jpeg', data: base64Image }
             });
         });
       }
@@ -169,14 +189,38 @@ export class GeminiLiveService {
   }
 
   private async handleMessage(message: LiveServerMessage) {
-    // Handle Audio Output
+    if (message.toolCall) {
+        for (const fc of message.toolCall.functionCalls) {
+            if (fc.name === 'updateBombState') {
+                const args = fc.args as any;
+                this.onBombUpdate({
+                    status: args.status,
+                    message: args.message,
+                    stability: Number(args.stability),
+                    timePenalty: args.timePenalty ? Number(args.timePenalty) : 0
+                });
+
+                if (this.sessionPromise) {
+                    this.sessionPromise.then(session => {
+                        session.sendToolResponse({
+                            functionResponses: {
+                                id: fc.id,
+                                name: fc.name,
+                                response: { result: "HUD updated" }
+                            }
+                        });
+                    });
+                }
+            }
+        }
+    }
+
     const modelTurn = message.serverContent?.modelTurn;
     if (modelTurn?.parts?.[0]?.inlineData?.data) {
         const base64Audio = modelTurn.parts[0].inlineData.data;
         await this.playAudioChunk(base64Audio);
     }
 
-    // Handle Interruption (User spoke over model)
     if (message.serverContent?.interrupted) {
         this.stopAudioPlayback();
     }
@@ -184,11 +228,9 @@ export class GeminiLiveService {
 
   private async playAudioChunk(base64Audio: string) {
     if (!this.outputAudioContext) return;
-
     try {
         const audioBytes = base64ToBytes(base64Audio);
         const audioBuffer = decodeAudioData(audioBytes, this.outputAudioContext, AUDIO_SAMPLE_RATE);
-        
         const source = this.outputAudioContext.createBufferSource();
         source.buffer = audioBuffer;
         
@@ -198,19 +240,13 @@ export class GeminiLiveService {
           source.connect(this.outputAudioContext.destination);
         }
         
-        // Schedule seamless playback
         const currentTime = this.outputAudioContext.currentTime;
-        if (this.nextStartTime < currentTime) {
-            this.nextStartTime = currentTime;
-        }
+        if (this.nextStartTime < currentTime) this.nextStartTime = currentTime;
         
         source.start(this.nextStartTime);
         this.nextStartTime += audioBuffer.duration;
-        
         this.sources.add(source);
-        source.onended = () => {
-            this.sources.delete(source);
-        };
+        source.onended = () => this.sources.delete(source);
     } catch (e) {
         console.error("Error decoding audio chunk", e);
     }
@@ -221,7 +257,6 @@ export class GeminiLiveService {
         try { source.stop(); } catch(e) {}
     });
     this.sources.clear();
-    // Reset timer, adding a small buffer to avoid glitching if restarting immediately
     if (this.outputAudioContext) {
         this.nextStartTime = this.outputAudioContext.currentTime + 0.1;
     }
@@ -237,8 +272,6 @@ export class GeminiLiveService {
         clearInterval(this.videoInterval);
         this.videoInterval = null;
     }
-    
-    // Stop Audio Processing
     if (this.inputSource) {
         this.inputSource.disconnect();
         this.inputSource = null;
@@ -247,17 +280,11 @@ export class GeminiLiveService {
         this.audioScriptProcessor.disconnect();
         this.audioScriptProcessor = null;
     }
-
-    // Stop Media Stream Tracks
     if (this.stream) {
         this.stream.getTracks().forEach(track => track.stop());
         this.stream = null;
     }
-
-    // Close Gemini Session (LiveClient doesn't have an explicit close, but we stop sending data)
     this.sessionPromise = null;
-
-    // Close Audio Contexts
     this.inputAudioContext?.close();
     this.outputAudioContext?.close();
     this.inputAudioContext = null;

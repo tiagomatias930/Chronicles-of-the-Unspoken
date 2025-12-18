@@ -1,6 +1,6 @@
 {
-  "name": "Chronicles of the Unspoken",
-  "description": "An immersive noir mystery interrogation game powered by Gemini Live API, analyzing voice tone and facial expressions.",
+  "name": "The Defusal",
+  "description": "High-stakes simulation. You have 60 seconds to defuse a biological bomb. UNIT-7, a panicked robot, guides you based on what it sees.",
   "requestFramePermissions": [
     "camera",
     "microphone"

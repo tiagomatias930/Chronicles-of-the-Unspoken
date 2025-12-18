@@ -1,0 +1,8 @@
+{
+  "name": "Chronicles of the Unspoken",
+  "description": "An immersive noir mystery interrogation game powered by Gemini Live API, analyzing voice tone and facial expressions.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

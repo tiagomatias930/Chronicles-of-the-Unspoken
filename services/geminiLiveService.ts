@@ -23,7 +23,7 @@ export class GeminiLiveService {
     this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
-  async connect(videoElement: HTMLVideoElement) {
+  async connect(videoElement: HTMLVideoElement, systemInstruction: string = SYSTEM_INSTRUCTION) {
     try {
       this.onStateChange(ConnectionState.CONNECTING);
 
@@ -64,7 +64,7 @@ export class GeminiLiveService {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }, // Deep, mysterious voice
           },
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction,
         },
         callbacks: {
           onopen: () => {

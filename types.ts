@@ -12,3 +12,20 @@ export interface AudioConfig {
 export interface PCMFloat32Data {
   data: Float32Array;
 }
+
+export interface GameLevelObjective {
+  id: string;
+  title: string;
+  description: string;
+  hint?: string;
+}
+
+export interface GameLevel {
+  id: string;
+  codename: string;
+  difficulty: 'INITIATE' | 'OPERATIVE' | 'VETERAN';
+  summary: string;
+  systemInstruction: string;
+  ambientTension: number;
+  objectives: GameLevelObjective[];
+}

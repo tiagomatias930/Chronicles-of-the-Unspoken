@@ -18,12 +18,13 @@ export class GeminiLiveService {
   
   public onStateChange: (state: ConnectionState) => void = () => {};
   public onError: (error: string) => void = () => {};
+  public onUserSpeaking: () => void = () => {};
 
   constructor() {
     this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
-  async connect(videoElement: HTMLVideoElement, systemInstruction: string = SYSTEM_INSTRUCTION) {
+  async connect(videoElement: HTMLVideoElement) {
     try {
       this.onStateChange(ConnectionState.CONNECTING);
 
@@ -64,7 +65,7 @@ export class GeminiLiveService {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }, // Deep, mysterious voice
           },
-          systemInstruction,
+          systemInstruction: SYSTEM_INSTRUCTION,
         },
         callbacks: {
           onopen: () => {
@@ -102,6 +103,18 @@ export class GeminiLiveService {
 
     this.audioScriptProcessor.onaudioprocess = (e) => {
       const inputData = e.inputBuffer.getChannelData(0); // Float32Array
+      
+      // Calculate RMS to detect user speech activity
+      let sum = 0;
+      for (let i = 0; i < inputData.length; i++) {
+        sum += inputData[i] * inputData[i];
+      }
+      const rms = Math.sqrt(sum / inputData.length);
+      // Threshold 0.02 is arbitrary but works well for general speech detection
+      if (rms > 0.02) {
+        this.onUserSpeaking();
+      }
+
       // Convert to 16-bit PCM for Gemini
       const pcm16 = float32To16BitPCM(inputData);
       const uint8Buffer = new Uint8Array(pcm16);
@@ -242,8 +255,6 @@ export class GeminiLiveService {
     }
 
     // Close Gemini Session (LiveClient doesn't have an explicit close, but we stop sending data)
-    // There isn't a direct .close() on the session object in the current SDK snippet, 
-    // but stopping the stream essentially ends the user interaction. 
     this.sessionPromise = null;
 
     // Close Audio Contexts

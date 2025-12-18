@@ -1,127 +1,42 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
-import { AmbientSoundService } from '../services/ambientSoundService';
-import { ConnectionState, GameLevel } from '../types';
+import { ConnectionState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
-import { Power, Radio, AlertTriangle, Fingerprint, Activity, Camera, Volume2, VolumeX, Layers, Target, CheckCircle2, Flag } from 'lucide-react';
+import { Power, Radio, AlertTriangle, Fingerprint, Activity, Mic, Camera, HelpCircle } from 'lucide-react';
 import clsx from 'clsx';
-import { GAME_LEVELS } from '../gameLevels';
+
+const HINTS = [
+  "Vex smells fear. Speak with authority.",
+  "Don't look away. Maintain eye contact with the camera.",
+  "Silence is weakness here. Press him for the location.",
+  "If he laughs at you, interrupt him. Assert dominance.",
+  "Your voice tone betrays you. Keep it steady.",
+  "He is hiding something about 'Sector 4'. Ask specifically.",
+  "Don't let him control the pace. Be the detective.",
+  "Vex respects power. Show him who is in charge."
+];
 
 const GameInterface: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [service] = useState(() => new GeminiLiveService());
-  const [soundService] = useState(() => new AmbientSoundService());
-    const levels = useMemo(() => GAME_LEVELS, []);
-    const [selectedLevelId, setSelectedLevelId] = useState(() => levels[0]?.id ?? '');
-    const [objectiveProgress, setObjectiveProgress] = useState<Record<string, Record<string, boolean>>>(() => {
-        const initial: Record<string, Record<string, boolean>> = {};
-        levels.forEach((level) => {
-            initial[level.id] = level.objectives.reduce<Record<string, boolean>>((acc, objective) => {
-                acc[objective.id] = false;
-                return acc;
-            }, {});
-        });
-        return initial;
-    });
-    const selectedLevel = useMemo<GameLevel | undefined>(
-        () => levels.find((level) => level.id === selectedLevelId),
-        [levels, selectedLevelId],
-    );
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
+  const [error, setError] = useState<string | null>(null);
   
-    const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
-    const [error, setError] = useState<string | null>(null);
-    const [isMuted, setIsMuted] = useState(false);
-
-    const LEVEL_STORAGE_KEY = 'chronicles:selectedLevel';
-    const OBJECTIVE_STORAGE_KEY = 'chronicles:objectives';
-
-    useEffect(() => {
-        if (!selectedLevel && levels[0]) {
-            setSelectedLevelId(levels[0].id);
-        }
-    }, [levels, selectedLevel]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const storedLevelId = window.localStorage.getItem(LEVEL_STORAGE_KEY);
-        if (storedLevelId && levels.some((level) => level.id === storedLevelId)) {
-            setSelectedLevelId(storedLevelId);
-        }
-
-        const storedObjectives = window.localStorage.getItem(OBJECTIVE_STORAGE_KEY);
-        if (!storedObjectives) return;
-
-        try {
-            const parsed = JSON.parse(storedObjectives) as Record<string, Record<string, boolean>>;
-            setObjectiveProgress((prev) => {
-                const next: Record<string, Record<string, boolean>> = { ...prev };
-                levels.forEach((level) => {
-                    const savedLevel = parsed[level.id];
-                    if (!savedLevel) return;
-                    const sanitized: Record<string, boolean> = { ...next[level.id] };
-                    level.objectives.forEach((objective) => {
-                        if (typeof savedLevel[objective.id] === 'boolean') {
-                            sanitized[objective.id] = savedLevel[objective.id];
-                        }
-                    });
-                    next[level.id] = sanitized;
-                });
-                return next;
-            });
-        } catch (err) {
-            console.warn('Falha ao carregar progresso dos objetivos.', err);
-        }
-    }, [LEVEL_STORAGE_KEY, OBJECTIVE_STORAGE_KEY, levels]);
-
-    useEffect(() => {
-        setObjectiveProgress((prev) => {
-            let mutated = false;
-            const next: Record<string, Record<string, boolean>> = { ...prev };
-
-            levels.forEach((level) => {
-                if (!next[level.id]) {
-                    mutated = true;
-                    next[level.id] = level.objectives.reduce<Record<string, boolean>>((acc, objective) => {
-                        acc[objective.id] = false;
-                        return acc;
-                    }, {});
-                    return;
-                }
-
-                const levelState = { ...next[level.id] };
-                let levelMutated = false;
-                level.objectives.forEach((objective) => {
-                    if (!(objective.id in levelState)) {
-                        levelState[objective.id] = false;
-                        levelMutated = true;
-                    }
-                });
-
-                if (levelMutated) {
-                    next[level.id] = levelState;
-                    mutated = true;
-                }
-            });
-
-            return mutated ? next : prev;
-        });
-    }, [levels]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || !selectedLevelId) return;
-        window.localStorage.setItem(LEVEL_STORAGE_KEY, selectedLevelId);
-    }, [LEVEL_STORAGE_KEY, selectedLevelId]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        window.localStorage.setItem(OBJECTIVE_STORAGE_KEY, JSON.stringify(objectiveProgress));
-    }, [OBJECTIVE_STORAGE_KEY, objectiveProgress]);
+  // Hint System State
+  const [currentHint, setCurrentHint] = useState<string | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+  const interactionIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     service.onStateChange = setConnectionState;
     service.onError = setError;
     
+    // Reset inactivity timer when user speaks
+    service.onUserSpeaking = () => {
+        lastActivityRef.current = Date.now();
+        setCurrentHint(null); // Hide hint if user becomes active
+    };
+
     // Check for API key presence securely
     if (!process.env.API_KEY) {
         setError("API_KEY not found in environment.");
@@ -129,76 +44,45 @@ const GameInterface: React.FC = () => {
 
     return () => {
       service.disconnect();
-      soundService.stop();
+      if (interactionIntervalRef.current) clearInterval(interactionIntervalRef.current);
     };
-  }, [service, soundService]);
+  }, [service]);
 
-  // Handle ambient tension based on game state
-    useEffect(() => {
-        const base = selectedLevel?.ambientTension ?? 0;
-        let tension = Math.max(0, base - 0.1);
+  // Monitor inactivity to trigger hints
+  useEffect(() => {
+    if (connectionState !== ConnectionState.CONNECTED) {
+        setCurrentHint(null);
+        return;
+    }
 
-        if (connectionState === ConnectionState.CONNECTING) {
-            tension = Math.min(1, base + 0.15);
-        }
+    lastActivityRef.current = Date.now(); // Reset on connect
 
-        if (connectionState === ConnectionState.CONNECTED) {
-            tension = Math.min(1, base + 0.25);
-        }
-
-        soundService.setTension(tension);
-    }, [connectionState, soundService, selectedLevel]);
-
-    const toggleConnection = useCallback(async () => {
-        // Start audio engine on first interaction
-        soundService.start();
-
-        if (connectionState === ConnectionState.CONNECTED || connectionState === ConnectionState.CONNECTING) {
-            await service.disconnect();
-        } else {
-            if (!selectedLevel) {
-                setError('Nenhum nivel selecionado.');
-                return;
-            }
-
-            setError(null);
-            if (videoRef.current) {
-                await service.connect(videoRef.current, selectedLevel.systemInstruction);
-            }
-        }
-    }, [connectionState, selectedLevel, service, soundService]);
-
-    const selectedLevelObjectives = selectedLevel ? objectiveProgress[selectedLevel.id] ?? {} : {};
-    const completedObjectives = selectedLevel
-        ? Object.values(selectedLevelObjectives).filter(Boolean).length
-        : 0;
-    const totalObjectives = selectedLevel?.objectives.length ?? 0;
-    const isLevelSelectionLocked =
-        connectionState === ConnectionState.CONNECTED || connectionState === ConnectionState.CONNECTING;
-
-    const toggleObjective = useCallback(
-        (objectiveId: string) => {
-            if (!selectedLevel) return;
-
-            setObjectiveProgress((prev) => {
-                const levelState = { ...(prev[selectedLevel.id] ?? {}) };
-                levelState[objectiveId] = !levelState[objectiveId];
-                return {
-                    ...prev,
-                    [selectedLevel.id]: levelState,
-                };
+    interactionIntervalRef.current = window.setInterval(() => {
+        const timeSinceActivity = Date.now() - lastActivityRef.current;
+        // If inactive for > 8 seconds, show a hint
+        if (timeSinceActivity > 8000) {
+            setCurrentHint((prev) => {
+                if (prev) return prev; // Don't change existing hint until cleared
+                return HINTS[Math.floor(Math.random() * HINTS.length)];
             });
-        },
-        [selectedLevel],
-    );
+        }
+    }, 1000);
 
-    const toggleMute = () => {
-      const newState = !isMuted;
-      setIsMuted(newState);
-      soundService.toggleMute(newState);
-      // Also ensure audio engine is started if user clicks mute button first
-      soundService.start(); 
-  };
+    return () => {
+        if (interactionIntervalRef.current) clearInterval(interactionIntervalRef.current);
+    };
+  }, [connectionState]);
+
+  const toggleConnection = useCallback(async () => {
+    if (connectionState === ConnectionState.CONNECTED || connectionState === ConnectionState.CONNECTING) {
+      await service.disconnect();
+    } else {
+      setError(null);
+      if (videoRef.current) {
+        await service.connect(videoRef.current);
+      }
+    }
+  }, [connectionState, service]);
 
   const isLive = connectionState === ConnectionState.CONNECTED;
 
@@ -231,6 +115,19 @@ const GameInterface: React.FC = () => {
                         playsInline 
                     />
                     
+                    {/* Dynamic Hint Overlay */}
+                    {currentHint && isLive && (
+                        <div className="absolute bottom-4 left-4 right-4 animate-in slide-in-from-bottom-2 fade-in duration-500">
+                             <div className="bg-black/80 border-l-2 border-yellow-500 p-3 backdrop-blur-sm flex items-start gap-3 shadow-lg">
+                                <HelpCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                                <div className="text-yellow-500 font-mono text-xs md:text-sm tracking-wide">
+                                    <span className="font-bold block mb-1">SYSTEM ADVISORY:</span>
+                                    {currentHint}
+                                </div>
+                             </div>
+                        </div>
+                    )}
+                    
                     {/* HUD Overlay */}
                     <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between">
                         <div className="flex justify-between text-[10px] text-red-500/70 font-mono">
@@ -259,23 +156,12 @@ const GameInterface: React.FC = () => {
                     )}
                 </div>
 
-                <div className="border border-red-900/30 bg-black/40 p-3 rounded flex items-center justify-between">
-                    <div className="flex flex-col gap-1 w-full mr-4">
-                        <div className="flex items-center gap-2 text-xs font-mono text-red-400">
-                            <Activity className="w-4 h-4" />
-                            <span>VOICE_STRESS_ANALYZER</span>
-                        </div>
-                        <AudioVisualizer isActive={isLive} />
+                <div className="border border-red-900/30 bg-black/40 p-3 rounded">
+                    <div className="flex items-center gap-2 text-xs font-mono text-red-400 mb-2">
+                        <Activity className="w-4 h-4" />
+                        <span>VOICE_STRESS_ANALYZER</span>
                     </div>
-                    
-                    {/* Audio Toggle */}
-                    <button 
-                        onClick={toggleMute}
-                        className="p-2 hover:bg-red-900/30 rounded text-red-500 transition-colors"
-                        title="Toggle Ambient Audio"
-                    >
-                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                    </button>
+                    <AudioVisualizer isActive={isLive} />
                 </div>
             </div>
 
@@ -287,8 +173,8 @@ const GameInterface: React.FC = () => {
                         <span className="text-red-600">Unspoken</span>
                     </h1>
                     <p className="text-gray-400 text-sm font-mono mb-8 border-l-2 border-red-800 pl-4 py-1">
-                        MISSION: Interrogate 'Vex'.<br/>
-                        OPERACAO: {selectedLevel?.codename ?? 'EM ESPERA'} ({selectedLevel?.difficulty ?? 'N/A'}).<br/>
+                        MISSION: Interrogate 'Vex'. <br/>
+                        WARNING: Subject analyzes micro-expressions and tone.<br/>
                         STATUS: {connectionState}
                     </p>
                 </div>
@@ -301,115 +187,12 @@ const GameInterface: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="p-4 border border-gray-700 bg-gray-900/50 rounded-lg">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-xs font-mono text-red-400 uppercase tracking-widest">
-                                <Layers className="w-4 h-4" />
-                                <span>NIVEIS DE OPERACAO</span>
-                            </div>
-                            {selectedLevel && (
-                                <div className="flex items-center gap-2 text-xs font-mono text-gray-300">
-                                    <Flag className="w-4 h-4" />
-                                    <span>{selectedLevel.difficulty}</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            {levels.map((level, index) => {
-                                const isActive = level.id === selectedLevelId;
-                                return (
-                                    <button
-                                        key={level.id}
-                                        type="button"
-                                        onClick={() => setSelectedLevelId(level.id)}
-                                        disabled={isLevelSelectionLocked && !isActive}
-                                        title={
-                                            isLevelSelectionLocked && !isActive
-                                                ? 'Finalize a sessao atual para trocar de nivel.'
-                                                : undefined
-                                        }
-                                        className={clsx(
-                                            'text-left p-3 border rounded bg-black/30 transition-all duration-200 focus:outline-none',
-                                            isActive
-                                                ? 'border-red-500/80 bg-red-900/30 text-red-100 shadow-[0_0_20px_rgba(248,113,113,0.2)]'
-                                                : 'border-gray-700 text-gray-300 hover:border-red-700/70 hover:bg-red-900/10 disabled:cursor-not-allowed disabled:opacity-40',
-                                        )}
-                                    >
-                                        <p className="text-[11px] font-mono uppercase tracking-widest text-red-400/80">
-                                            NIVEL {index + 1} · {level.difficulty}
-                                        </p>
-                                        <p className="text-sm font-semibold text-white mt-1">{level.codename}</p>
-                                        <p className="text-xs text-gray-400 mt-2" title={level.summary}>
-                                            {level.summary.length > 100 ? `${level.summary.slice(0, 97)}...` : level.summary}
-                                        </p>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
                     <div className="p-4 border border-gray-700 bg-gray-900/50 rounded-lg text-sm text-gray-300 font-mono">
-                        <div className="flex items-center gap-2 text-red-400 font-bold uppercase text-xs tracking-widest">
-                            <Target className="w-4 h-4" />
-                            <span>[ INTELLIGENCE BRIEF ]</span>
-                        </div>
-                        <p className="leading-relaxed mt-3">
-                            {selectedLevel
-                                ? selectedLevel.summary
-                                : 'Selecione um nivel para configurar o interrogatorio.'}
+                        <p className="mb-2 text-red-400 font-bold uppercase text-xs tracking-widest">[ INTELLIGENCE BRIEF ]</p>
+                        <p className="leading-relaxed">
+                            Vex is waiting. He won't respond to buttons or text. Speak to him. 
+                            He smells fear. If you stutter, he laughs. If you stare him down and demand answers, he might crack.
                         </p>
-                    </div>
-
-                    <div className="p-4 border border-gray-700 bg-gray-900/50 rounded-lg">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs font-mono text-red-400 uppercase tracking-widest">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>DESAFIOS ATIVOS</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs font-mono text-gray-300">
-                                <CheckCircle2 className="w-4 h-4 text-red-400" />
-                                <span>
-                                    {selectedLevel ? `${completedObjectives}/${totalObjectives}` : '--'}
-                                </span>
-                            </div>
-                        </div>
-
-                        {selectedLevel ? (
-                            <ul className="mt-4 space-y-3">
-                                {selectedLevel.objectives.map((objective) => {
-                                    const done = selectedLevelObjectives[objective.id] ?? false;
-                                    return (
-                                        <li
-                                            key={objective.id}
-                                            className={clsx(
-                                                'border border-red-900/30 bg-black/30 rounded p-3',
-                                                done && 'border-red-500/70 bg-red-900/20 shadow-[0_0_12px_rgba(248,113,113,0.2)]',
-                                            )}
-                                        >
-                                            <label className="flex items-start gap-3 cursor-pointer select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    className="mt-1 h-4 w-4 rounded border border-red-500/40 bg-black text-red-500 focus:ring-1 focus:ring-red-500"
-                                                    checked={done}
-                                                    onChange={() => toggleObjective(objective.id)}
-                                                />
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white">{objective.title}</p>
-                                                    <p className="text-xs text-gray-400 mt-1">{objective.description}</p>
-                                                    {objective.hint && (
-                                                        <p className="text-[11px] text-red-400/80 mt-1">Hint: {objective.hint}</p>
-                                                    )}
-                                                </div>
-                                            </label>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        ) : (
-                            <p className="mt-3 text-xs text-gray-400 font-mono">
-                                Selecione um nivel para acompanhar os desafios.
-                            </p>
-                        )}
                     </div>
                 </div>
 

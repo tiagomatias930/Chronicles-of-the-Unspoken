@@ -1,6 +1,6 @@
 {
-  "name": "The Defusal",
-  "description": "High-stakes simulation. You have 60 seconds to defuse a biological bomb. UNIT-7, a panicked robot, guides you based on what it sees.",
+  "name": "Chronicles of the Unspoken",
+  "description": "A 3-stage sci-fi narrative campaign driven by your voice and camera. Interrogate suspects, trade in black markets, and defuse bombs using Gemini 2.5.",
   "requestFramePermissions": [
     "camera",
     "microphone"

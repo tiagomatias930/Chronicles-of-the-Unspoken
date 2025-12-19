@@ -5,36 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Chronicles of the Unspoken</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Cinzel:wght@400;700&display=swap');
-      
       body {
-        background-color: #050505;
-        color: #e0e0e0;
-        font-family: 'JetBrains Mono', monospace;
+        background-color: #0f1923; /* Valorant Dark Blue/Black */
+        color: #ece8e1; /* Bone White */
+        font-family: 'Rajdhani', sans-serif;
       }
       
-      .scanline {
-        background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
-        background-size: 100% 4px;
-        position: fixed;
-        pointer-events: none;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 50;
-        opacity: 0.15;
+      /* Tactical Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
       }
-
-      .flicker {
-        animation: flicker 0.15s infinite;
+      ::-webkit-scrollbar-track {
+        background: #0f1923;
       }
-
-      @keyframes flicker {
-        0% { opacity: 0.9; }
-        50% { opacity: 1.0; }
-        100% { opacity: 0.9; }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #ff4655;
       }
     </style>
   <script type="importmap">
@@ -49,9 +41,13 @@
   }
 }
 </script>
+    <!-- MediaPipe Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
   <body>
     <div id="root"></div>
-    <div class="scanline"></div>
   </body>
 </html>

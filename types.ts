@@ -11,9 +11,10 @@ export enum GameLevel {
   LOBBY = 0,
   INTERROGATION = 1,
   CYBER = 2,
-  MARKET = 3,
-  DEFUSAL = 4,
-  VICTORY = 5
+  FORENSICS = 3,
+  MARKET = 4,
+  DEFUSAL = 5,
+  VICTORY = 6
 }
 
 export interface AudioConfig {
@@ -34,11 +35,18 @@ export interface InterrogationState {
 // Level 2 State (Cyber)
 export interface CyberState {
   firewallIntegrity: number; // 100-0
-  uploadSpeed: number; // visual metric
+  statusMessage: string;
+  uploadSpeed: number;
+}
+
+// Level 3 State (Forensics) - NEW
+export interface ForensicsState {
+  corruptionLevel: number; // 100-0
+  evidenceFound: string[];
   statusMessage: string;
 }
 
-// Level 3 State (Market)
+// Level 4 State (Market)
 export interface MarketState {
   credits: number;
   lastItem: string;
@@ -46,7 +54,7 @@ export interface MarketState {
   message: string;
 }
 
-// Level 4 State (Bomb)
+// Level 5 State (Bomb)
 export interface BombState {
   status: 'active' | 'exploded' | 'defused';
   message: string;

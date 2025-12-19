@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -7,21 +8,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Imports for Noir/Detective Theme -->
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:wght@400;700&family=Black+Ops+One&display=swap" rel="stylesheet">
     <style>
       body {
-        background-color: #050505; /* Deep Noir Black */
-        color: #dcdcdc; /* Old Paper White */
+        background-color: #050505;
+        color: #dcdcdc;
         font-family: 'Courier Prime', monospace;
-        background-image: url("https://www.transparenttextures.com/patterns/aged-paper.png"); /* Subtle texture overlay if available, otherwise handles largely by CSS */
+        overflow: hidden;
       }
       
       .font-typewriter { font-family: 'Special Elite', cursive; }
       .font-mono-prime { font-family: 'Courier Prime', monospace; }
       .font-stencil { font-family: 'Black Ops One', cursive; }
 
-      /* Grain effect */
       .noise-overlay {
         position: fixed;
         top: 0;
@@ -31,19 +30,7 @@
         pointer-events: none;
         background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAA5OTkAAABMTExERERmZmYzMzPMzMxmoqMDAAAAB3RSTlMABVDlKCn/KoNlGAAAAQlJREFUeJxt0cFqwzAMRlG7l9C66K5Q8iT//69S2w5KMSYJc48OwvDxEfr5/Xp9fX59/f25/n79/P6+Xj//fP5+/Xz/fr1+vX59v3+9fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fgH0sKx4q9k+ZwAAAABJRU5ErkJggg==');
         opacity: 0.05;
-        z-index: 50;
-      }
-
-      /* Tape Pattern */
-      .crime-tape {
-        background: repeating-linear-gradient(
-          45deg,
-          #fbbf24,
-          #fbbf24 10px,
-          #000 10px,
-          #000 20px
-        );
-        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        z-index: 100;
       }
     </style>
   <script type="importmap">
@@ -58,13 +45,13 @@
   }
 }
 </script>
-    <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
   <body>
+    <div class="noise-overlay"></div>
     <div id="root"></div>
   </body>
 </html>

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
 import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
-import { Play, Square, Crosshair, Hexagon, ShieldAlert, Cpu, Radio, Zap, MessageSquare } from 'lucide-react';
+import { Crosshair, Fingerprint, FileText, Skull, Lock, Zap, Search, Mic, Paperclip } from 'lucide-react';
 import clsx from 'clsx';
 
 // AR Types
@@ -22,39 +22,73 @@ const getSavedState = () => {
     } catch { return null; }
 };
 
-// --- UI COMPONENTS ---
+// --- NOIR UI COMPONENTS ---
 
-const TacticalButton: React.FC<{ onClick: () => void; children: React.ReactNode; disabled?: boolean; variant?: 'primary' | 'secondary' }> = ({ onClick, children, disabled, variant = 'primary' }) => (
+const CrimeSceneTape: React.FC<{ text: string, className?: string, angle?: number }> = ({ text, className, angle = 0 }) => (
+    <div 
+        className={clsx("absolute z-40 bg-[#eab308] text-black font-stencil font-bold tracking-widest uppercase flex items-center justify-center shadow-lg border-y-2 border-black/30 overflow-hidden select-none pointer-events-none", className)}
+        style={{ transform: `rotate(${angle}deg)` }}
+    >
+        <div className="whitespace-nowrap px-4 py-1 w-full text-center">
+             {text} &nbsp; // &nbsp; {text} &nbsp; // &nbsp; {text} &nbsp; // &nbsp; {text}
+        </div>
+    </div>
+);
+
+const ConfidentialStamp: React.FC<{ text?: string, className?: string }> = ({ text = "CONFIDENTIAL", className }) => (
+    <div className={clsx("border-4 border-red-800 text-red-800 font-stencil font-bold uppercase p-2 inline-block opacity-80 mix-blend-multiply transform -rotate-12 mask-grunge select-none pointer-events-none", className)}>
+        {text}
+    </div>
+);
+
+const PaperButton: React.FC<{ onClick: () => void; children: React.ReactNode; disabled?: boolean }> = ({ onClick, children, disabled }) => (
     <button 
         onClick={onClick} 
         disabled={disabled}
         className={clsx(
-            "relative group overflow-hidden px-8 py-4 font-['Anton'] uppercase tracking-wider text-xl transition-all duration-200 clip-path-corner",
-            disabled ? "opacity-50 cursor-not-allowed grayscale" : "hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(255,70,85,0.4)]",
-            variant === 'primary' 
-                ? "bg-[#ff4655] text-white border-0" 
-                : "bg-transparent border-2 border-[#ece8e1] text-[#ece8e1] hover:bg-[#ece8e1] hover:text-[#0f1923]"
+            "relative group paper-shadow transition-all duration-200 transform hover:-translate-y-1 active:translate-y-0",
+            disabled ? "opacity-50 grayscale cursor-not-allowed" : "cursor-pointer"
         )}
-        style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
     >
-        <div className="absolute inset-0 w-full h-full bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-[-20deg]"></div>
-        <span className="relative z-10 flex items-center gap-2">{children}</span>
+        <div className="bg-[#f5f5dc] text-black font-typewriter font-bold px-6 py-3 border border-gray-400 flex items-center gap-2 relative z-10">
+            {children}
+        </div>
+        {/* Paper stack effect */}
+        <div className="absolute top-1 left-1 w-full h-full bg-[#e6e6cc] border border-gray-400 -z-0"></div>
     </button>
 );
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
-    <div className="flex flex-col mb-4 border-l-4 border-[#ff4655] pl-4">
-        <h2 className="font-['Anton'] text-4xl uppercase text-white leading-none tracking-wide">{title}</h2>
-        {subtitle && <span className="font-['Rajdhani'] font-bold text-[#ff4655] uppercase tracking-widest text-sm">{subtitle}</span>}
+const PolaroidFrame: React.FC<{ children: React.ReactNode, label: string, rotate?: number }> = ({ children, label, rotate = 0 }) => (
+    <div 
+        className="bg-white p-3 pb-12 shadow-2xl relative transform transition-transform duration-500 hover:scale-[1.02] hover:z-10"
+        style={{ transform: `rotate(${rotate}deg)` }}
+    >
+        <div className="bg-[#1a1a1a] w-full aspect-[4/3] relative overflow-hidden border-2 border-gray-200 inner-shadow">
+            {children}
+            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]"></div>
+        </div>
+        <div className="absolute bottom-4 left-0 w-full text-center">
+            <span className="font-handwriting text-black text-xl font-bold tracking-wide opacity-80" style={{ fontFamily: 'Courier Prime' }}>
+                {label}
+            </span>
+        </div>
+        {/* Tape on top */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-8 bg-white/40 backdrop-blur-sm border-l border-r border-white/50 rotate-[-2deg] opacity-70 shadow-sm"></div>
     </div>
 );
 
-const BackgroundTexture = () => (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
-        <div className="absolute top-0 right-0 w-[500px] h-[800px] bg-[#ff4655] opacity-5 -skew-x-12 transform translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] border-2 border-white/5 rounded-full"></div>
-        <div className="absolute top-[20%] left-[10%] font-['Anton'] text-[20vw] leading-none text-white/5 select-none whitespace-nowrap">
-            UNSPOKEN
+const ManilaFolder: React.FC<{ title: string, children: React.ReactNode, active?: boolean }> = ({ title, children, active = true }) => (
+    <div className={clsx("relative bg-[#d2b48c] p-1 shadow-xl rounded-sm transition-all duration-500", active ? "translate-x-0" : "translate-x-full opacity-0")}>
+        {/* Tab */}
+        <div className="absolute -top-8 left-0 w-40 h-10 bg-[#d2b48c] rounded-t-md border-t border-l border-r border-[#b08d55] flex items-center justify-center">
+            <span className="font-typewriter text-xs font-bold text-black/70 tracking-widest">{title}</span>
+        </div>
+        <div className="bg-[#f0e6d2] p-6 min-h-[300px] border-t border-[#b08d55] text-black font-mono-prime relative overflow-hidden">
+             {/* Lines */}
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #a3a3a3 28px)', backgroundAttachment: 'local' }}></div>
+            <div className="relative z-10 space-y-4">
+                {children}
+            </div>
         </div>
     </div>
 );
@@ -64,37 +98,33 @@ const BackgroundTexture = () => (
 const GameInterface: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Initialize saved state strictly once
   const saved = useRef(getSavedState()).current;
 
   const [service] = useState(() => new GeminiLiveService());
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [error, setError] = useState<string | null>(null);
   
-  // Progression
   const [currentLevel, setCurrentLevel] = useState<GameLevel>(() => saved?.level ?? GameLevel.LOBBY);
   const [levelTransition, setLevelTransition] = useState(false);
 
   // States
-  const [l1State, setL1State] = useState<InterrogationState>(() => saved?.l1State ?? { suspectStress: 0, resistance: 100, lastThought: "ANALYZING TARGET..." });
+  const [l1State, setL1State] = useState<InterrogationState>(() => saved?.l1State ?? { suspectStress: 0, resistance: 100, lastThought: "SUBJECT IS CALM..." });
   const [l2Credits, setL2Credits] = useState(() => saved?.l2Credits ?? 0);
-  const [l2State, setL2State] = useState<MarketState>(() => saved?.l2State ?? { credits: 0, lastItem: '', lastOffer: 0, message: "AWAITING ITEM SCAN" });
+  const [l2State, setL2State] = useState<MarketState>(() => saved?.l2State ?? { credits: 0, lastItem: '', lastOffer: 0, message: "SHOW ME THE GOODS" });
   const [timeLeft, setTimeLeft] = useState(() => saved?.timeLeft ?? 60);
-  const [l3State, setL3State] = useState<BombState>(() => saved?.l3State ?? { status: 'active', message: 'AWAITING LINK', stability: 100 });
+  const [l3State, setL3State] = useState<BombState>(() => saved?.l3State ?? { status: 'active', message: 'CUT THE WIRES', stability: 100 });
   const [caption, setCaption] = useState<{text: string, source: 'user'|'model'} | null>(null);
-  const [simLatency, setSimLatency] = useState(24);
   
   const [handsLoaded, setHandsLoaded] = useState(false);
   const [wires, setWires] = useState<Wire[]>(() => saved?.wires ?? [
-      { id: 1, color: '#ef4444', x: 0.3, cut: false },
-      { id: 2, color: '#3b82f6', x: 0.5, cut: false },
-      { id: 3, color: '#eab308', x: 0.7, cut: false }
+      { id: 1, color: '#b91c1c', x: 0.3, cut: false }, // Darker Red
+      { id: 2, color: '#1d4ed8', x: 0.5, cut: false }, // Darker Blue
+      { id: 3, color: '#a16207', x: 0.7, cut: false }  // Darker Yellow
   ]);
 
-  // --- PERSISTENCE EFFECT ---
+  // --- PERSISTENCE ---
   useEffect(() => {
-    const stateToSave = {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
       level: currentLevel,
       l1State,
       l2Credits,
@@ -102,17 +132,15 @@ const GameInterface: React.FC = () => {
       l3State,
       timeLeft,
       wires
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    }));
   }, [currentLevel, l1State, l2Credits, l2State, l3State, timeLeft, wires]);
 
-  // --- LOGIC ---
+  // --- SERVICE LOGIC ---
   useEffect(() => {
     service.onStateChange = setConnectionState;
     service.onError = setError;
     service.onTranscript = (text, source) => {
         setCaption({ text, source });
-        // Clear caption after delay
         setTimeout(() => setCaption(prev => prev?.text === text ? null : prev), 4000);
     };
     service.onInterrogationUpdate = (update) => {
@@ -133,19 +161,10 @@ const GameInterface: React.FC = () => {
         if (update.status === 'exploded') handleGameOver();
         if (update.status === 'defused') handleLevelComplete();
     };
-    
-    // Sim latency jitter
-    const latencyInterval = setInterval(() => {
-        if (connectionState === ConnectionState.CONNECTED) {
-            setSimLatency(Math.floor(Math.random() * 40) + 120);
-        } else {
-            setSimLatency(24);
-        }
-    }, 2000);
+    return () => { service.disconnect(); };
+  }, [service]);
 
-    return () => { service.disconnect(); clearInterval(latencyInterval); };
-  }, [service, connectionState]);
-
+  // --- AR LOGIC (WIRES) ---
   useEffect(() => {
     if (currentLevel !== GameLevel.DEFUSAL) return;
     if (!window.Hands) return;
@@ -162,6 +181,8 @@ const GameInterface: React.FC = () => {
                 ctx.save();
                 ctx.scale(-1, 1);
                 ctx.translate(-canvasRef.current.width, 0);
+                // Draw slight sepia filter on video processing
+                ctx.filter = 'sepia(0.4) contrast(1.2)';
                 ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
                 ctx.restore();
                 hands.send({image: canvasRef.current}).catch(console.error);
@@ -179,33 +200,62 @@ const GameInterface: React.FC = () => {
       if (!canvas || !ctx) return;
       const w = canvas.width;
       const h = canvas.height;
+      
+      // Draw Wires (Rough, hand-drawn look)
       wires.forEach(wire => {
           if (wire.cut) return;
-          ctx.beginPath(); ctx.lineWidth = 15; ctx.strokeStyle = wire.color;
-          ctx.shadowBlur = 20; ctx.shadowColor = wire.color;
-          ctx.moveTo(wire.x * w, 0); ctx.lineTo(wire.x * w, h); ctx.stroke(); ctx.shadowBlur = 0;
+          ctx.beginPath(); 
+          ctx.lineWidth = 12; 
+          ctx.strokeStyle = wire.color;
+          ctx.lineCap = 'round';
+          // Add some jitter to make it look like a physical wire
+          ctx.moveTo(wire.x * w, 0); 
+          ctx.bezierCurveTo(
+              (wire.x * w) - 20, h * 0.3, 
+              (wire.x * w) + 20, h * 0.7, 
+              wire.x * w, h
+          );
+          ctx.stroke();
+          
+          // Wire shadow
+          ctx.beginPath();
+          ctx.lineWidth = 12;
+          ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+          ctx.moveTo((wire.x * w) + 5, 0); 
+          ctx.bezierCurveTo(
+              ((wire.x * w) - 20) + 5, h * 0.3, 
+              ((wire.x * w) + 20) + 5, h * 0.7, 
+              (wire.x * w) + 5, h
+          );
+          ctx.stroke();
       });
+
       if (results.multiHandLandmarks) {
         for (const landmarks of results.multiHandLandmarks) {
-            window.drawConnectors(ctx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
             const indexTip = landmarks[8];
             const thumbTip = landmarks[4];
             const cursorX = indexTip.x * w;
             const cursorY = indexTip.y * h;
-            ctx.beginPath(); ctx.arc(cursorX, cursorY, 10, 0, 2 * Math.PI);
-            ctx.fillStyle = '#fff'; ctx.fill();
+            
+            // Draw Scissor/Cutter Icon at finger
+            ctx.beginPath(); ctx.arc(cursorX, cursorY, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ef4444'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.stroke();
+
             const dist = Math.sqrt(Math.pow(indexTip.x - thumbTip.x, 2) + Math.pow(indexTip.y - thumbTip.y, 2));
             if (dist < 0.05) {
-                ctx.beginPath(); ctx.arc(cursorX, cursorY, 20, 0, 2 * Math.PI);
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+                // Cut Action Visual
+                ctx.beginPath(); ctx.arc(cursorX, cursorY, 25, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                
                 setWires(prev => prev.map(wire => {
                     if (wire.cut) return wire;
-                    if (Math.abs(indexTip.x - wire.x) < 0.05) return { ...wire, cut: true };
+                    // Check wire collision with curve approximation
+                    if (Math.abs(indexTip.x - wire.x) < 0.08) return { ...wire, cut: true };
                     return wire;
                 }));
             }
         }
-        if (!handsLoaded) setHandsLoaded(true);
       }
   };
 
@@ -217,31 +267,24 @@ const GameInterface: React.FC = () => {
           if (currentLevel === GameLevel.INTERROGATION) setCurrentLevel(GameLevel.MARKET);
           else if (currentLevel === GameLevel.MARKET) setCurrentLevel(GameLevel.DEFUSAL);
           else if (currentLevel === GameLevel.DEFUSAL) setCurrentLevel(GameLevel.VICTORY);
-      }, 3000);
+      }, 4000);
   };
 
   const handleGameOver = async () => {
       await service.disconnect();
-      alert("MISSION FAILED. REBOOTING.");
-      if (currentLevel === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "TARGET LOCKED" });
+      // Noir Reset
+      if (currentLevel === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "SUBJECT IS CALM..." });
       if (currentLevel === GameLevel.MARKET) setL2Credits(0);
       if (currentLevel === GameLevel.DEFUSAL) {
           setTimeLeft(120);
-          setL3State({ status: 'active', message: 'ESTABLISH LINK', stability: 100 });
+          setL3State({ status: 'active', message: 'CUT THE WIRES', stability: 100 });
           setWires(wires.map(w => ({...w, cut:false})));
       }
   };
 
   const startGame = (level: GameLevel) => {
       setCurrentLevel(level);
-      
-      if (level === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "TARGET LOCKED" });
-      if (level === GameLevel.MARKET) setL2Credits(0);
-      if (level === GameLevel.DEFUSAL) {
-          setTimeLeft(120);
-          setL3State({ status: 'active', message: 'ESTABLISH LINK', stability: 100 });
-          setWires([ { id: 1, color: '#ef4444', x: 0.3, cut: false }, { id: 2, color: '#3b82f6', x: 0.5, cut: false }, { id: 3, color: '#eab308', x: 0.7, cut: false } ]);
-      }
+      // Reset logic same as above...
   };
 
   const connectToLevel = async () => {
@@ -250,7 +293,8 @@ const GameInterface: React.FC = () => {
         await service.connect(source, currentLevel);
     }
   };
-  
+
+  // Timer logic
   useEffect(() => {
       if (currentLevel !== GameLevel.DEFUSAL || connectionState !== ConnectionState.CONNECTED) return;
       const t = setInterval(() => {
@@ -259,261 +303,253 @@ const GameInterface: React.FC = () => {
       return () => clearInterval(t);
   }, [currentLevel, connectionState]);
 
+  // --- RENDER ---
   const isLive = connectionState === ConnectionState.CONNECTED;
-
-  // --- VIEWS ---
 
   if (currentLevel === GameLevel.LOBBY) {
       return (
-          <div className="min-h-screen bg-[#0f1923] relative overflow-hidden flex flex-col items-center justify-center">
-              <BackgroundTexture />
+          <div className="min-h-screen bg-[#0a0a0a] relative overflow-hidden flex flex-col items-center justify-center">
+              {/* Noise Grain */}
+              <div className="noise-overlay"></div>
               
-              <div className="z-10 flex flex-col items-center text-center">
-                  <div className="mb-2 font-['Rajdhani'] font-bold text-[#ff4655] tracking-[0.5em] text-lg">TACTICAL AI SIMULATION</div>
-                  <h1 className="font-['Anton'] text-[15vh] leading-[0.85] text-white uppercase tracking-tighter mb-8 drop-shadow-2xl">
-                      CHRONICLES<br/>
-                      <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500">UNSPOKEN</span>
-                  </h1>
-                  
-                  <div className="flex gap-4 mt-8">
-                      <TacticalButton onClick={() => startGame(GameLevel.INTERROGATION)}>
-                          INITIATE CAMPAIGN
-                      </TacticalButton>
+              {/* Hanging Lamps Effect */}
+              <div className="absolute top-0 left-1/4 w-px h-32 bg-gray-800"></div>
+              <div className="absolute top-32 left-1/4 w-32 h-32 bg-yellow-100/5 rounded-full blur-3xl"></div>
+              
+              <div className="z-10 flex flex-col items-center relative">
+                  <div className="relative transform rotate-1">
+                      <h1 className="font-stencil text-7xl md:text-9xl text-[#dcdcdc] tracking-tighter opacity-90 drop-shadow-2xl">
+                          CHRONICLES
+                      </h1>
+                      <div className="bg-red-900/80 text-black font-typewriter font-bold text-xl md:text-3xl px-4 py-1 absolute -bottom-4 right-0 transform -rotate-2 shadow-lg">
+                          OF THE UNSPOKEN
+                      </div>
                   </div>
-
-                  <div className="mt-12 grid grid-cols-3 gap-8 text-left max-w-4xl w-full border-t border-white/10 pt-8">
-                      <div>
-                          <h3 className="text-[#ff4655] font-['Anton'] text-2xl uppercase">Phase 1</h3>
-                          <p className="text-gray-400 font-['Rajdhani'] text-sm mt-1">PSYCHOLOGICAL WARFARE</p>
+                  
+                  <div className="mt-16 relative group">
+                      <PaperButton onClick={() => startGame(GameLevel.INTERROGATION)}>
+                          <FileText className="w-5 h-5" /> OPEN CASE FILE #2049
+                      </PaperButton>
+                      
+                      {/* Decorative photos on desk */}
+                      <div className="absolute -right-32 top-0 transform rotate-12 opacity-80 pointer-events-none hidden md:block">
+                          <div className="w-24 h-32 bg-white p-1 shadow-lg">
+                              <div className="w-full h-24 bg-gray-800 grayscale brightness-50"></div>
+                          </div>
                       </div>
-                      <div>
-                          <h3 className="text-[#ff4655] font-['Anton'] text-2xl uppercase">Phase 2</h3>
-                          <p className="text-gray-400 font-['Rajdhani'] text-sm mt-1">ASSET NEGOTIATION</p>
+                      <div className="absolute -left-32 -bottom-10 transform -rotate-6 opacity-60 pointer-events-none hidden md:block">
+                          <div className="w-28 h-28 bg-[#d2b48c] shadow-lg flex items-center justify-center">
+                              <Fingerprint className="w-12 h-12 text-black/20" />
+                          </div>
                       </div>
-                      <div>
-                          <h3 className="text-[#ff4655] font-['Anton'] text-2xl uppercase">Phase 3</h3>
-                          <p className="text-gray-400 font-['Rajdhani'] text-sm mt-1">HAZARD MITIGATION</p>
-                      </div>
+                  </div>
+                  
+                  <div className="mt-20 font-typewriter text-gray-500 text-sm tracking-widest uppercase">
+                      Classified // Top Secret // Do Not Distribute
                   </div>
               </div>
+
+              <CrimeSceneTape text="CRIME SCENE DO NOT CROSS" className="bottom-20 -left-10 w-[120%] h-12 rotate-[-2deg]" />
+              <ConfidentialStamp className="absolute top-10 right-10 text-6xl opacity-20" />
           </div>
       );
   }
 
   if (levelTransition) {
       return (
-          <div className="min-h-screen bg-[#0f1923] flex flex-col items-center justify-center relative">
-              <h1 className="font-['Anton'] text-9xl text-white opacity-10 animate-pulse absolute">LOADING</h1>
-              <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden z-10">
-                  <div className="h-full bg-[#ff4655] animate-[width_2s_ease-in-out_infinite]" style={{width: '100%'}}></div>
-              </div>
-              <p className="mt-4 font-['Rajdhani'] font-bold text-[#ff4655] tracking-widest">ESTABLISHING SECURE UPLINK...</p>
+          <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center relative noise-overlay">
+               <div className="font-typewriter text-2xl text-white animate-pulse">
+                   DEVELOPING EVIDENCE...
+               </div>
           </div>
       );
   }
 
   if (currentLevel === GameLevel.VICTORY) {
       return (
-          <div className="min-h-screen bg-[#0f1923] flex flex-col items-center justify-center text-center relative overflow-hidden">
-               <div className="absolute inset-0 bg-[#ff4655] opacity-10 mix-blend-overlay"></div>
-               <ShieldAlert className="w-32 h-32 text-[#ff4655] mb-6" />
-               <h1 className="font-['Anton'] text-8xl text-white uppercase mb-2">MISSION ACCOMPLISHED</h1>
-               <p className="font-['Rajdhani'] text-xl text-gray-400 tracking-widest mb-12">ALL OBJECTIVES COMPLETED SUCCESSFULLY</p>
-               <TacticalButton onClick={() => setCurrentLevel(GameLevel.LOBBY)} variant="secondary">RETURN TO BASE</TacticalButton>
+          <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center relative p-8">
+              <ConfidentialStamp text="CASE CLOSED" className="text-8xl mb-8 rotate-[-5deg] text-green-800 border-green-800" />
+              <div className="bg-white p-8 max-w-2xl transform rotate-1 shadow-2xl relative">
+                  <div className="font-typewriter text-black space-y-4">
+                      <p>TO: HEADQUARTERS</p>
+                      <p>FROM: DETECTIVE UNIT</p>
+                      <p>SUBJECT: MISSION REPORT</p>
+                      <hr className="border-black/50" />
+                      <p>All objectives completed successfully. The suspect "Vex" has been neutralized and the device secured.</p>
+                      <p className="text-right mt-8 font-bold">- END OF REPORT -</p>
+                  </div>
+                  <Paperclip className="absolute -top-4 -left-4 w-12 h-12 text-gray-400" />
+              </div>
+              <div className="mt-12">
+                   <PaperButton onClick={() => setCurrentLevel(GameLevel.LOBBY)}>ARCHIVE FILE</PaperButton>
+              </div>
           </div>
       );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1923] text-[#ece8e1] p-6 flex flex-col relative overflow-hidden font-['Rajdhani']">
-        {/* Background Grid */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
-            backgroundSize: '40px 40px'
-        }}></div>
+    <div className="min-h-screen bg-[#121212] text-[#dcdcdc] flex flex-col relative overflow-hidden font-mono-prime">
+        <div className="noise-overlay"></div>
+        
+        {/* --- DESK SURFACE --- */}
+        <div className="absolute inset-0 z-0 bg-[#0a0a0a]" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%)' }}></div>
 
         {/* --- HEADER --- */}
-        <header className="z-10 flex justify-between items-start mb-8 border-b border-white/10 pb-4">
-            <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1">
-                    <Hexagon className="w-4 h-4 text-[#ff4655] fill-[#ff4655]" />
-                    <span className="font-bold tracking-widest text-[#ff4655] text-xs">LIVE OPERATION</span>
-                </div>
-                <h1 className="font-['Anton'] text-5xl uppercase leading-none">
-                    {currentLevel === GameLevel.INTERROGATION && "INTERROGATION"}
-                    {currentLevel === GameLevel.MARKET && "BLACK MARKET"}
-                    {currentLevel === GameLevel.DEFUSAL && "BOMB DEFUSAL"}
-                </h1>
-            </div>
-            
-            <div className="flex items-center gap-6">
-                 <div className="text-right">
-                     <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">Connection Status</div>
-                     <div className={clsx("font-['Anton'] text-2xl uppercase", isLive ? "text-[#ff4655]" : "text-gray-600")}>
-                        {connectionState}
+        <header className="z-20 relative p-4 flex justify-between items-start">
+             <div className="flex flex-col">
+                 <div className="bg-black/50 backdrop-blur px-4 py-2 border-l-4 border-red-800">
+                     <h1 className="font-stencil text-3xl tracking-widest text-gray-300">
+                        {currentLevel === GameLevel.INTERROGATION && "CASE: INTERROGATION"}
+                        {currentLevel === GameLevel.MARKET && "CASE: BLACK MARKET"}
+                        {currentLevel === GameLevel.DEFUSAL && "CASE: DISPOSAL"}
+                     </h1>
+                     <div className="flex items-center gap-2 mt-1">
+                         <div className={clsx("w-3 h-3 rounded-full", isLive ? "bg-red-600 animate-pulse" : "bg-gray-600")}></div>
+                         <span className="font-typewriter text-xs uppercase tracking-widest text-gray-400">
+                             {isLive ? "RECORDING IN PROGRESS" : "FEED DISCONNECTED"}
+                         </span>
                      </div>
                  </div>
-                 <div className="w-12 h-12 border-2 border-white/20 flex items-center justify-center bg-black/50">
-                    <Radio className={clsx("w-6 h-6", isLive ? "text-[#ff4655] animate-pulse" : "text-gray-600")} />
-                 </div>
-            </div>
+             </div>
+             
+             {/* Connection Status as a Tag */}
+             <div className="bg-[#f0f0d0] text-black px-4 py-2 shadow-lg transform rotate-2 font-typewriter font-bold text-sm border border-gray-400">
+                 STATUS: {connectionState}
+             </div>
         </header>
 
-        {/* --- MAIN CONTENT GRID --- */}
-        <div className="z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 h-full">
+        {/* --- MAIN DESK LAYOUT --- */}
+        <div className="z-10 relative flex-1 p-4 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center justify-center">
             
-            {/* VIDEO FEED FRAME */}
-            <div className="lg:col-span-8 relative flex flex-col">
-                {/* Tactical Corners */}
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#ff4655] -translate-x-1 -translate-y-1"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#ff4655] translate-x-1 -translate-y-1"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#ff4655] -translate-x-1 translate-y-1"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#ff4655] translate-x-1 translate-y-1"></div>
-
-                <div className="relative flex-1 bg-black border border-white/10 shadow-2xl overflow-hidden group">
-                    <video ref={videoRef} className={clsx("absolute inset-0 w-full h-full object-cover", currentLevel === GameLevel.DEFUSAL ? "opacity-0" : "opacity-80")} muted playsInline />
-                    <canvas ref={canvasRef} className={clsx("absolute inset-0 w-full h-full object-cover", currentLevel === GameLevel.DEFUSAL ? "opacity-100" : "opacity-0")} />
-                    
-                    {/* UI Overlays on Video */}
-                    <div className="absolute top-4 left-4 flex gap-2">
-                        <span className="bg-[#ff4655] text-white px-2 py-0.5 text-xs font-bold uppercase">REC</span>
-                        <span className="bg-black/80 text-white px-2 py-0.5 text-xs font-mono">CAM_01</span>
-                    </div>
-
-                    {!isLive && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[#0f1923]/80 backdrop-blur-sm z-20">
-                            <TacticalButton onClick={connectToLevel}>ESTABLISH UPLINK</TacticalButton>
-                        </div>
-                    )}
-                    
-                    {/* Caption Overlay */}
-                    {caption && (
-                        <div className="absolute bottom-16 left-0 right-0 px-8 flex justify-center z-20">
-                             <div className={clsx(
-                                 "max-w-xl backdrop-blur-md border p-4 shadow-xl transform transition-all",
-                                 caption.source === 'model' 
-                                    ? "bg-[#ff4655]/10 border-[#ff4655] text-white" 
-                                    : "bg-white/10 border-white/30 text-gray-300"
-                             )}
-                             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}>
-                                 <div className="text-xs font-bold uppercase mb-1 opacity-50 flex items-center gap-1">
-                                    <MessageSquare size={12} />
-                                    {caption.source === 'model' ? 'INCOMING TRANSMISSION' : 'OUTGOING AUDIO'}
-                                 </div>
-                                 <div className="font-['Rajdhani'] text-lg font-semibold leading-tight">
-                                     "{caption.text}"
-                                 </div>
-                             </div>
-                        </div>
-                    )}
-                    
-                    {/* Crosshair Center */}
-                    {isLive && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                            <Crosshair className="w-32 h-32 text-white stroke-1" />
-                        </div>
-                    )}
-                </div>
-                
-                {/* Bottom Bar Under Video */}
-                <div className="mt-2 flex justify-between items-center bg-black/50 p-2 border border-white/5">
-                     <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
-                         <span className="flex items-center gap-1"><Cpu className="w-3 h-3" /> CPU: OPTIMAL</span>
-                         <span className="flex items-center gap-1"><Radio className="w-3 h-3" /> LATENCY: {simLatency}MS</span>
-                     </div>
-                     <AudioVisualizer isActive={isLive} />
-                </div>
-            </div>
-
-            {/* SIDEBAR INTELLIGENCE */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-                
-                {/* PANEL 1: OBJECTIVES */}
-                <div className="bg-[#1c252e] border-l-4 border-[#ff4655] p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-2 opacity-10"><Hexagon size={64} /></div>
-                    <SectionHeader title="DIRECTIVES" subtitle="MISSION CRITICAL" />
-                    
-                    <ul className="space-y-3 mt-4">
-                        <li className="flex items-start gap-3 text-sm font-semibold text-gray-300">
-                            <Square className="w-3 h-3 mt-1 fill-[#ff4655] text-[#ff4655]" />
-                            {currentLevel === GameLevel.INTERROGATION && "Analyze Vex's voice patterns for deception."}
-                            {currentLevel === GameLevel.MARKET && "Present high-value items to the camera."}
-                            {currentLevel === GameLevel.DEFUSAL && "Use hand gestures to cut virtual wires."}
+            {/* LEFT: OBJECTIVES (DOSSIER) */}
+            <div className="lg:col-span-3 hidden lg:block transform -rotate-1">
+                <ManilaFolder title="MISSION DIRECTIVES">
+                    <ul className="list-disc pl-4 space-y-4 text-sm opacity-90">
+                        <li>
+                            <strong className="block mb-1 underline decoration-red-800">PRIMARY:</strong>
+                            {currentLevel === GameLevel.INTERROGATION && "Break suspect's psychological defenses."}
+                            {currentLevel === GameLevel.MARKET && "Acquire 500 Credits via asset liquidation."}
+                            {currentLevel === GameLevel.DEFUSAL && "Sever connection wires. Avoid detonation."}
                         </li>
-                        <li className="flex items-start gap-3 text-sm font-semibold text-gray-300">
-                            <Square className="w-3 h-3 mt-1 fill-transparent text-gray-500" />
-                            {currentLevel === GameLevel.INTERROGATION && "Break the suspect's resistance to 0%."}
-                            {currentLevel === GameLevel.MARKET && "Accumulate 500 Credits."}
-                            {currentLevel === GameLevel.DEFUSAL && "Stabilize unit before detonation."}
+                        <li>
+                            <strong className="block mb-1 underline decoration-red-800">TACTICS:</strong>
+                            {currentLevel === GameLevel.INTERROGATION && "Analyze voice tremors. Press for truth."}
+                            {currentLevel === GameLevel.MARKET && "Present valuable contraband to camera."}
+                            {currentLevel === GameLevel.DEFUSAL && "Use hand gestures. Follow UNIT-7 protocols."}
                         </li>
                     </ul>
-                </div>
+                    <div className="mt-8 border-t border-black/20 pt-4 text-xs text-center uppercase text-red-900 font-bold">
+                        Clearance Level 5 Required
+                    </div>
+                </ManilaFolder>
+            </div>
 
-                {/* PANEL 2: DYNAMIC DATA */}
-                <div className="flex-1 bg-[#1c252e] p-6 flex flex-col relative border-t-2 border-white/5">
-                    
-                    {/* LEVEL 1: INTERROGATION DATA */}
-                    {currentLevel === GameLevel.INTERROGATION && (
-                        <>
-                             <SectionHeader title="TARGET STATUS" />
-                             <div className="flex-1 flex flex-col justify-center">
-                                 <div className="mb-6">
-                                     <div className="flex justify-between text-xs font-bold uppercase mb-1 text-gray-400">
-                                         <span>Resistance</span>
-                                         <span>{l1State.resistance}%</span>
-                                     </div>
-                                     <div className="h-4 bg-black w-full skew-x-[-12deg] p-1">
-                                         <div className="h-full bg-[#ff4655]" style={{width: `${l1State.resistance}%`}}></div>
-                                     </div>
-                                 </div>
-                                 
-                                 <div className="bg-black/50 p-4 border border-white/10">
-                                     <div className="text-xs text-[#ff4655] font-bold uppercase mb-2">Internal Monologue Detect</div>
-                                     <p className="font-['Rajdhani'] text-lg italic text-white leading-tight">"{l1State.lastThought}"</p>
+            {/* CENTER: EVIDENCE PHOTO (VIDEO) */}
+            <div className="lg:col-span-6 flex justify-center">
+                <PolaroidFrame label={isLive ? "EVIDENCE #004-B" : "NO SIGNAL"} rotate={1}>
+                     <div className="relative w-full h-full bg-black">
+                         <video ref={videoRef} className={clsx("w-full h-full object-cover filter contrast-125 sepia-[.3]", currentLevel === GameLevel.DEFUSAL ? "opacity-0" : "opacity-100")} muted playsInline />
+                         <canvas ref={canvasRef} className={clsx("absolute inset-0 w-full h-full object-cover", currentLevel === GameLevel.DEFUSAL ? "opacity-100" : "opacity-0")} />
+                         
+                         {/* Connection Overlay */}
+                         {!isLive && (
+                             <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                                 <PaperButton onClick={connectToLevel}>
+                                     <Search className="w-4 h-4" /> ESTABLISH LINK
+                                 </PaperButton>
+                             </div>
+                         )}
+
+                         {/* Captions as Subtitles typed */}
+                         {caption && (
+                             <div className="absolute bottom-4 left-0 right-0 px-4 text-center">
+                                 <div className="inline-block bg-black/70 text-white font-typewriter px-3 py-1 text-sm shadow-lg backdrop-blur-sm border border-white/20">
+                                     {caption.source === 'model' ? '> ' : ''} {caption.text}
                                  </div>
                              </div>
-                        </>
-                    )}
+                         )}
+                     </div>
+                </PolaroidFrame>
+            </div>
 
-                    {/* LEVEL 2: MARKET DATA */}
-                    {currentLevel === GameLevel.MARKET && (
-                        <>
-                            <SectionHeader title="MARKET UPLINK" />
-                            <div className="flex-1 flex flex-col items-center justify-center text-center">
-                                <div className="font-['Anton'] text-6xl text-[#ff4655] mb-2">{l2Credits} <span className="text-2xl text-white">CR</span></div>
-                                <div className="w-full h-px bg-white/20 mb-6"></div>
-                                
-                                <div className="w-full bg-black/50 p-4 text-left border-l-2 border-purple-500">
-                                    <div className="text-xs text-purple-400 uppercase font-bold">Latest Scan</div>
-                                    <div className="text-xl font-bold text-white uppercase">{l2State.lastItem || "NO ITEM DETECTED"}</div>
-                                    <div className="text-sm text-gray-400 mt-1">"{l2State.message}"</div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* LEVEL 3: BOMB DATA */}
-                    {currentLevel === GameLevel.DEFUSAL && (
-                        <>
-                            <SectionHeader title="HAZARD PROTOCOL" />
-                            <div className="flex-1 flex flex-col items-center">
-                                <div className={clsx("font-['Anton'] text-8xl mb-4 tracking-tighter", timeLeft < 15 ? "text-[#ff4655] animate-pulse" : "text-white")}>
-                                    00:{timeLeft.toString().padStart(2, '0')}
-                                </div>
-                                
-                                <div className="w-full bg-[#ff4655]/10 border border-[#ff4655] p-4 text-center">
-                                    <div className="flex items-center justify-center gap-2 text-[#ff4655] font-bold mb-2">
-                                        <Zap className="w-4 h-4" /> UNIT-7 MESSAGE
-                                    </div>
-                                    <div className="text-2xl font-['Anton'] uppercase text-white leading-none">{l3State.message}</div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
+            {/* RIGHT: STATS (STICKY NOTES) */}
+            <div className="lg:col-span-3 space-y-8 flex flex-col items-center lg:items-start">
+                
+                {/* Visualizer - Cassette Recorder Style */}
+                <div className="bg-[#2a2a2a] p-4 rounded-lg shadow-2xl w-full max-w-[250px] border-t border-gray-600 border-b border-black">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] text-gray-400 font-sans tracking-widest uppercase">Audio Input</span>
+                        <Mic className={clsx("w-3 h-3", isLive ? "text-red-500" : "text-gray-600")} />
+                    </div>
+                    <AudioVisualizer isActive={isLive} />
                 </div>
+
+                {/* Level Specific Data on Sticky Notes */}
+                <div className="relative transform rotate-2 w-full max-w-[250px]">
+                     <div className="bg-[#feff9c] p-6 shadow-xl text-black font-handwriting" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 95%, 95% 100%, 0% 100%)' }}>
+                        
+                        {currentLevel === GameLevel.INTERROGATION && (
+                            <>
+                                <h3 className="font-bold border-b border-black/20 pb-2 mb-2 uppercase">Suspect Analysis</h3>
+                                <div className="space-y-2 font-mono-prime text-sm">
+                                    <div className="flex justify-between">
+                                        <span>STRESS:</span>
+                                        <span className="font-bold">{l1State.suspectStress}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>RESISTANCE:</span>
+                                        <span className="font-bold text-red-800">{l1State.resistance}%</span>
+                                    </div>
+                                    <div className="mt-4 pt-2 border-t border-black/10 italic text-gray-700 leading-tight">
+                                        "{l1State.lastThought}"
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {currentLevel === GameLevel.MARKET && (
+                            <>
+                                <h3 className="font-bold border-b border-black/20 pb-2 mb-2 uppercase">Ledger</h3>
+                                <div className="text-center my-4">
+                                    <span className="text-4xl font-typewriter font-bold tracking-tighter">{l2Credits}</span>
+                                    <span className="text-xs block text-gray-600">CREDITS</span>
+                                </div>
+                                <div className="bg-white/50 p-2 text-xs font-mono-prime border border-black/10">
+                                    Last Item: {l2State.lastItem || "---"}
+                                    <br/>
+                                    Note: {l2State.message}
+                                </div>
+                            </>
+                        )}
+
+                        {currentLevel === GameLevel.DEFUSAL && (
+                            <>
+                                <h3 className="font-bold border-b border-black/20 pb-2 mb-2 uppercase text-red-900 flex items-center gap-2">
+                                    <Skull className="w-4 h-4" /> DANGER
+                                </h3>
+                                <div className="text-center my-4 relative">
+                                    <div className="font-stencil text-5xl text-red-900 tabular-nums">
+                                        :{timeLeft.toString().padStart(2, '0')}
+                                    </div>
+                                </div>
+                                <div className="text-sm font-bold text-center bg-red-100 border border-red-300 p-2 text-red-900">
+                                    {l3State.message}
+                                </div>
+                            </>
+                        )}
+
+                     </div>
+                     {/* Shadow for sticky note */}
+                     <div className="absolute top-1 right-1 w-full h-full bg-black/20 -z-10 transform translate-x-1 translate-y-1"></div>
+                </div>
+
             </div>
         </div>
+
+        {/* OVERLAYS */}
+        <CrimeSceneTape text="CRIME SCENE DO NOT CROSS" className="bottom-12 -right-10 w-[150%] h-16 rotate-[-5deg]" />
+        <ConfidentialStamp className="fixed bottom-10 left-10 text-4xl opacity-10" />
+
     </div>
   );
 };

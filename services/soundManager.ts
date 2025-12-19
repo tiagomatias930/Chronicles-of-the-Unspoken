@@ -6,6 +6,7 @@ export class SoundManager {
   private activeNodes: AudioNode[] = [];
   private isMuted: boolean = false;
   private currentLevel: GameLevel | null = null;
+  private readonly MASTER_VOL = 0.1; // Reduced from 0.4 to 0.1 for background subtlety
 
   constructor() {
     // AudioContext must be initialized after a user gesture usually, 
@@ -17,7 +18,7 @@ export class SoundManager {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.masterGain = this.ctx.createGain();
       this.masterGain.connect(this.ctx.destination);
-      this.masterGain.gain.value = this.isMuted ? 0 : 0.4; // Default volume
+      this.masterGain.gain.value = this.isMuted ? 0 : this.MASTER_VOL;
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
@@ -26,10 +27,10 @@ export class SoundManager {
 
   public toggleMute(muted: boolean) {
     this.isMuted = muted;
-    if (this.masterGain) {
-      const now = this.ctx!.currentTime;
+    if (this.masterGain && this.ctx) {
+      const now = this.ctx.currentTime;
       this.masterGain.gain.cancelScheduledValues(now);
-      this.masterGain.gain.linearRampToValueAtTime(muted ? 0 : 0.4, now + 0.5);
+      this.masterGain.gain.linearRampToValueAtTime(muted ? 0 : this.MASTER_VOL, now + 0.5);
     }
   }
 
@@ -61,13 +62,11 @@ export class SoundManager {
 
   private stopCurrentSounds() {
     // Fade out all active nodes and disconnect them
-    const now = this.ctx!.currentTime;
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
     this.activeNodes.forEach((node) => {
-      if (node instanceof OscillatorNode) {
+      if (node instanceof OscillatorNode || node instanceof AudioBufferSourceNode) {
         try {
-            // Check if it's an oscillator or part of a chain
-            // We usually store the GainNode associated with the source to fade it
-             // Simple clean up for this demo: just stop/disconnect
              node.stop(now + 2);
         } catch(e) {}
       }
@@ -78,7 +77,6 @@ export class SoundManager {
     
     // Clear array after fade time
     setTimeout(() => {
-        // Disconnect logic could go here to be cleaner memory-wise
         this.activeNodes = [];
     }, 2000);
   }
@@ -156,12 +154,12 @@ export class SoundManager {
      const bufferSize = 2 * this.ctx.sampleRate;
      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
      const output = noiseBuffer.getChannelData(0);
-     let lastOut = 0; // Moved variable declaration before usage in loop
+     let lastOut = 0; 
      for (let i = 0; i < bufferSize; i++) {
        const white = Math.random() * 2 - 1;
        output[i] = (lastOut + (0.02 * white)) / 1.02;
        lastOut = output[i];
-       output[i] *= 3.5; 
+       output[i] *= 1.5; // Reduced from 3.5 to prevent clipping and loudness
      }
 
      const noise = this.ctx.createBufferSource();
@@ -170,7 +168,7 @@ export class SoundManager {
 
      const filter = this.ctx.createBiquadFilter();
      filter.type = 'highpass';
-     filter.frequency.value = 300;
+     filter.frequency.value = 1000; // Increased from 300 to 1000 to clear voice range
 
      const gain = this.ctx.createGain();
      gain.gain.setValueAtTime(0, t);

@@ -13,6 +13,16 @@ declare global {
 
 interface Wire { id: number; color: string; x: number; cut: boolean; }
 
+const STORAGE_KEY = 'CHRONICLES_GAME_STATE';
+
+const getSavedState = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const item = localStorage.getItem(STORAGE_KEY);
+        return item ? JSON.parse(item) : null;
+    } catch { return null; }
+};
+
 // --- UI COMPONENTS ---
 
 const TacticalButton: React.FC<{ onClick: () => void; children: React.ReactNode; disabled?: boolean; variant?: 'primary' | 'secondary' }> = ({ onClick, children, disabled, variant = 'primary' }) => (
@@ -56,28 +66,46 @@ const GameInterface: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
+  // Initialize saved state strictly once
+  const saved = useRef(getSavedState()).current;
+
   const [service] = useState(() => new GeminiLiveService());
   const [soundManager] = useState(() => new SoundManager());
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [error, setError] = useState<string | null>(null);
   
   // Progression
-  const [currentLevel, setCurrentLevel] = useState<GameLevel>(GameLevel.LOBBY);
+  const [currentLevel, setCurrentLevel] = useState<GameLevel>(() => saved?.level ?? GameLevel.LOBBY);
   const [levelTransition, setLevelTransition] = useState(false);
 
   // States
-  const [l1State, setL1State] = useState<InterrogationState>({ suspectStress: 0, resistance: 100, lastThought: "ANALYZING TARGET..." });
-  const [l2Credits, setL2Credits] = useState(0);
-  const [l2State, setL2State] = useState<MarketState>({ credits: 0, lastItem: '', lastOffer: 0, message: "AWAITING ITEM SCAN" });
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [l3State, setL3State] = useState<BombState>({ status: 'active', message: 'AWAITING LINK', stability: 100 });
+  const [l1State, setL1State] = useState<InterrogationState>(() => saved?.l1State ?? { suspectStress: 0, resistance: 100, lastThought: "ANALYZING TARGET..." });
+  const [l2Credits, setL2Credits] = useState(() => saved?.l2Credits ?? 0);
+  const [l2State, setL2State] = useState<MarketState>(() => saved?.l2State ?? { credits: 0, lastItem: '', lastOffer: 0, message: "AWAITING ITEM SCAN" });
+  const [timeLeft, setTimeLeft] = useState(() => saved?.timeLeft ?? 60);
+  const [l3State, setL3State] = useState<BombState>(() => saved?.l3State ?? { status: 'active', message: 'AWAITING LINK', stability: 100 });
+  
   const [handsLoaded, setHandsLoaded] = useState(false);
-  const [wires, setWires] = useState<Wire[]>([
+  const [wires, setWires] = useState<Wire[]>(() => saved?.wires ?? [
       { id: 1, color: '#ef4444', x: 0.3, cut: false },
       { id: 2, color: '#3b82f6', x: 0.5, cut: false },
       { id: 3, color: '#eab308', x: 0.7, cut: false }
   ]);
   const [isMuted, setIsMuted] = useState(false);
+
+  // --- PERSISTENCE EFFECT ---
+  useEffect(() => {
+    const stateToSave = {
+      level: currentLevel,
+      l1State,
+      l2Credits,
+      l2State,
+      l3State,
+      timeLeft,
+      wires
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+  }, [currentLevel, l1State, l2Credits, l2State, l3State, timeLeft, wires]);
 
   // --- AUDIO LOGIC ---
   useEffect(() => {
@@ -196,10 +224,11 @@ const GameInterface: React.FC = () => {
   const handleGameOver = async () => {
       await service.disconnect();
       alert("MISSION FAILED. REBOOTING.");
-      if (currentLevel === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "" });
+      if (currentLevel === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "TARGET LOCKED" });
       if (currentLevel === GameLevel.MARKET) setL2Credits(0);
       if (currentLevel === GameLevel.DEFUSAL) {
           setTimeLeft(120);
+          setL3State({ status: 'active', message: 'ESTABLISH LINK', stability: 100 });
           setWires(wires.map(w => ({...w, cut:false})));
       }
   };

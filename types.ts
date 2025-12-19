@@ -1,3 +1,4 @@
+
 export enum ConnectionState {
   DISCONNECTED = 'DISCONNECTED',
   CONNECTING = 'CONNECTING',
@@ -6,6 +7,7 @@ export enum ConnectionState {
 }
 
 export enum GameLevel {
+  INTRO = -1,
   LOBBY = 0,
   INTERROGATION = 1,
   MARKET = 2,

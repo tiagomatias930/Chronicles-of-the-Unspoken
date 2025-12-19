@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
-import { SoundManager } from '../services/soundManager';
 import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
-import { Play, Square, Crosshair, Hexagon, ShieldAlert, Cpu, Radio, Zap, Volume2, VolumeX } from 'lucide-react';
+import { Play, Square, Crosshair, Hexagon, ShieldAlert, Cpu, Radio, Zap, MessageSquare } from 'lucide-react';
 import clsx from 'clsx';
 
 // AR Types
@@ -70,7 +69,6 @@ const GameInterface: React.FC = () => {
   const saved = useRef(getSavedState()).current;
 
   const [service] = useState(() => new GeminiLiveService());
-  const [soundManager] = useState(() => new SoundManager());
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [error, setError] = useState<string | null>(null);
   
@@ -84,6 +82,8 @@ const GameInterface: React.FC = () => {
   const [l2State, setL2State] = useState<MarketState>(() => saved?.l2State ?? { credits: 0, lastItem: '', lastOffer: 0, message: "AWAITING ITEM SCAN" });
   const [timeLeft, setTimeLeft] = useState(() => saved?.timeLeft ?? 60);
   const [l3State, setL3State] = useState<BombState>(() => saved?.l3State ?? { status: 'active', message: 'AWAITING LINK', stability: 100 });
+  const [caption, setCaption] = useState<{text: string, source: 'user'|'model'} | null>(null);
+  const [simLatency, setSimLatency] = useState(24);
   
   const [handsLoaded, setHandsLoaded] = useState(false);
   const [wires, setWires] = useState<Wire[]>(() => saved?.wires ?? [
@@ -91,7 +91,6 @@ const GameInterface: React.FC = () => {
       { id: 2, color: '#3b82f6', x: 0.5, cut: false },
       { id: 3, color: '#eab308', x: 0.7, cut: false }
   ]);
-  const [isMuted, setIsMuted] = useState(false);
 
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
@@ -107,25 +106,15 @@ const GameInterface: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   }, [currentLevel, l1State, l2Credits, l2State, l3State, timeLeft, wires]);
 
-  // --- AUDIO LOGIC ---
-  useEffect(() => {
-    // Attempt to play ambience when level changes
-    // User interaction is usually required first, but we try anyway.
-    soundManager.playAmbience(currentLevel).catch(() => {
-        console.log("Audio waiting for user gesture");
-    });
-  }, [currentLevel, soundManager]);
-
-  const toggleMute = () => {
-      const newState = !isMuted;
-      setIsMuted(newState);
-      soundManager.toggleMute(newState);
-  };
-
   // --- LOGIC ---
   useEffect(() => {
     service.onStateChange = setConnectionState;
     service.onError = setError;
+    service.onTranscript = (text, source) => {
+        setCaption({ text, source });
+        // Clear caption after delay
+        setTimeout(() => setCaption(prev => prev?.text === text ? null : prev), 4000);
+    };
     service.onInterrogationUpdate = (update) => {
         setL1State(update);
         if (update.resistance <= 0) handleLevelComplete();
@@ -144,8 +133,18 @@ const GameInterface: React.FC = () => {
         if (update.status === 'exploded') handleGameOver();
         if (update.status === 'defused') handleLevelComplete();
     };
-    return () => { service.disconnect(); };
-  }, [service]);
+    
+    // Sim latency jitter
+    const latencyInterval = setInterval(() => {
+        if (connectionState === ConnectionState.CONNECTED) {
+            setSimLatency(Math.floor(Math.random() * 40) + 120);
+        } else {
+            setSimLatency(24);
+        }
+    }, 2000);
+
+    return () => { service.disconnect(); clearInterval(latencyInterval); };
+  }, [service, connectionState]);
 
   useEffect(() => {
     if (currentLevel !== GameLevel.DEFUSAL) return;
@@ -234,8 +233,6 @@ const GameInterface: React.FC = () => {
   };
 
   const startGame = (level: GameLevel) => {
-      // Trigger sound explicitly on user interaction to unlock AudioContext
-      soundManager.playAmbience(level);
       setCurrentLevel(level);
       
       if (level === GameLevel.INTERROGATION) setL1State({ suspectStress: 0, resistance: 100, lastThought: "TARGET LOCKED" });
@@ -248,8 +245,6 @@ const GameInterface: React.FC = () => {
   };
 
   const connectToLevel = async () => {
-    // Ensure sound is playing if it was paused
-    soundManager.playAmbience(currentLevel);
     if (videoRef.current) {
         const source = (currentLevel === GameLevel.DEFUSAL && canvasRef.current) ? canvasRef.current : videoRef.current;
         await service.connect(source, currentLevel);
@@ -352,9 +347,6 @@ const GameInterface: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-6">
-                 <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors">
-                     {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6 text-[#ff4655]" />}
-                 </button>
                  <div className="text-right">
                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">Connection Status</div>
                      <div className={clsx("font-['Anton'] text-2xl uppercase", isLive ? "text-[#ff4655]" : "text-gray-600")}>
@@ -394,6 +386,27 @@ const GameInterface: React.FC = () => {
                         </div>
                     )}
                     
+                    {/* Caption Overlay */}
+                    {caption && (
+                        <div className="absolute bottom-16 left-0 right-0 px-8 flex justify-center z-20">
+                             <div className={clsx(
+                                 "max-w-xl backdrop-blur-md border p-4 shadow-xl transform transition-all",
+                                 caption.source === 'model' 
+                                    ? "bg-[#ff4655]/10 border-[#ff4655] text-white" 
+                                    : "bg-white/10 border-white/30 text-gray-300"
+                             )}
+                             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}>
+                                 <div className="text-xs font-bold uppercase mb-1 opacity-50 flex items-center gap-1">
+                                    <MessageSquare size={12} />
+                                    {caption.source === 'model' ? 'INCOMING TRANSMISSION' : 'OUTGOING AUDIO'}
+                                 </div>
+                                 <div className="font-['Rajdhani'] text-lg font-semibold leading-tight">
+                                     "{caption.text}"
+                                 </div>
+                             </div>
+                        </div>
+                    )}
+                    
                     {/* Crosshair Center */}
                     {isLive && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
@@ -406,7 +419,7 @@ const GameInterface: React.FC = () => {
                 <div className="mt-2 flex justify-between items-center bg-black/50 p-2 border border-white/5">
                      <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
                          <span className="flex items-center gap-1"><Cpu className="w-3 h-3" /> CPU: OPTIMAL</span>
-                         <span className="flex items-center gap-1"><Radio className="w-3 h-3" /> LATENCY: 24MS</span>
+                         <span className="flex items-center gap-1"><Radio className="w-3 h-3" /> LATENCY: {simLatency}MS</span>
                      </div>
                      <AudioVisualizer isActive={isLive} />
                 </div>

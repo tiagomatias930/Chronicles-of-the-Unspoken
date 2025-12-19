@@ -67,6 +67,7 @@ export class GeminiLiveService {
   public onStateChange: (state: ConnectionState) => void = () => {};
   public onError: (error: string) => void = () => {};
   public onUserSpeaking: () => void = () => {};
+  public onTranscript: (text: string, source: 'user' | 'model') => void = () => {};
   
   // Level Callbacks
   public onInterrogationUpdate: (state: InterrogationState) => void = () => {};
@@ -135,6 +136,8 @@ export class GeminiLiveService {
           tools: tools,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: systemInstruction,
+          inputAudioTranscription: {}, // Enable transcription
+          outputAudioTranscription: {}, // Enable transcription
         },
         callbacks: {
           onopen: () => {
@@ -207,6 +210,14 @@ export class GeminiLiveService {
   }
 
   private async handleMessage(message: LiveServerMessage) {
+    // Handle Transcriptions
+    if (message.serverContent?.outputTranscription?.text) {
+        this.onTranscript(message.serverContent.outputTranscription.text, 'model');
+    }
+    if (message.serverContent?.inputTranscription?.text) {
+         this.onTranscript(message.serverContent.inputTranscription.text, 'user');
+    }
+
     if (message.toolCall) {
         for (const fc of message.toolCall.functionCalls) {
             const args = fc.args as any;

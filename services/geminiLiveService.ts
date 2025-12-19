@@ -1,6 +1,6 @@
 import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from '@google/genai';
-import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState } from '../types';
-import { GEMINI_MODEL, INPUT_SAMPLE_RATE, AUDIO_SAMPLE_RATE, INSTRUCTION_L1, INSTRUCTION_L2, INSTRUCTION_L3 } from '../constants';
+import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState, CyberState } from '../types';
+import { GEMINI_MODEL, INPUT_SAMPLE_RATE, AUDIO_SAMPLE_RATE, INSTRUCTION_L1, INSTRUCTION_L2, INSTRUCTION_L3, INSTRUCTION_L_CYBER } from '../constants';
 import { base64ToBytes, bytesToBase64, decodeAudioData, float32To16BitPCM } from './audioUtils';
 
 // --- TOOLS DEFINITIONS ---
@@ -20,7 +20,21 @@ const interrogationTool: FunctionDeclaration = {
   },
 };
 
-// L2 Tool
+// L2 Tool (Cyber)
+const cyberTool: FunctionDeclaration = {
+    name: 'updateCyberState',
+    description: 'Update the firewall hacking progress.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            firewallIntegrity: { type: Type.NUMBER, description: 'Percentage of firewall remaining (100-0)' },
+            statusMessage: { type: Type.STRING, description: 'System status message or error code' }
+        },
+        required: ['firewallIntegrity', 'statusMessage']
+    }
+};
+
+// L3 Tool (Market)
 const marketTool: FunctionDeclaration = {
   name: 'assessItem',
   description: 'Evaluate an item shown to the camera.',
@@ -35,7 +49,7 @@ const marketTool: FunctionDeclaration = {
   },
 };
 
-// L3 Tool
+// L4 Tool (Bomb)
 const bombTool: FunctionDeclaration = {
   name: 'updateBombState',
   description: 'Update bomb defusal status.',
@@ -71,6 +85,7 @@ export class GeminiLiveService {
   
   // Level Callbacks
   public onInterrogationUpdate: (state: InterrogationState) => void = () => {};
+  public onCyberUpdate: (state: CyberState) => void = () => {};
   public onMarketUpdate: (state: MarketState) => void = () => {};
   public onBombUpdate: (state: BombState) => void = () => {};
 
@@ -92,6 +107,11 @@ export class GeminiLiveService {
             systemInstruction = INSTRUCTION_L1;
             tools = [{ functionDeclarations: [interrogationTool] }];
             voiceName = 'Charon'; // Deep, mysterious
+            break;
+        case GameLevel.CYBER:
+            systemInstruction = INSTRUCTION_L_CYBER;
+            tools = [{ functionDeclarations: [cyberTool] }];
+            voiceName = 'Puck'; // Glitchy/Trickster
             break;
         case GameLevel.MARKET:
             systemInstruction = INSTRUCTION_L2;
@@ -226,6 +246,12 @@ export class GeminiLiveService {
                     suspectStress: Number(args.suspectStress),
                     resistance: Number(args.resistance),
                     lastThought: String(args.lastThought)
+                });
+            } else if (fc.name === 'updateCyberState') {
+                this.onCyberUpdate({
+                    firewallIntegrity: Number(args.firewallIntegrity),
+                    statusMessage: String(args.statusMessage),
+                    uploadSpeed: Math.random() * 100 
                 });
             } else if (fc.name === 'assessItem') {
                 this.onMarketUpdate({

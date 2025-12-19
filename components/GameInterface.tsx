@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
-import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState } from '../types';
+import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState, CyberState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
-import { Mic, Search, Skull, FileText, Lock, Radio, Play, FastForward, X, Menu as MenuIcon, RotateCcw, Power } from 'lucide-react';
+import { Mic, Search, Skull, FileText, Lock, Radio, Play, FastForward, X, Cpu } from 'lucide-react';
 import clsx from 'clsx';
 
 // AR Types
@@ -123,8 +123,9 @@ const FilingCabinet: React.FC<{ currentLevel: GameLevel, onSelectLevel: (l: Game
         <div className="flex-1 space-y-6">
             {[
                 { lvl: GameLevel.INTERROGATION, label: "CASE 01: VEX", icon: FileText },
-                { lvl: GameLevel.MARKET, label: "CASE 02: ZERO", icon: Lock },
-                { lvl: GameLevel.DEFUSAL, label: "CASE 03: BOOM", icon: Skull },
+                { lvl: GameLevel.CYBER, label: "CASE 02: GHOST", icon: Cpu },
+                { lvl: GameLevel.MARKET, label: "CASE 03: ZERO", icon: Lock },
+                { lvl: GameLevel.DEFUSAL, label: "CASE 04: BOOM", icon: Skull },
             ].map((item) => (
                 <div key={item.lvl} className="relative group">
                     <button 
@@ -139,7 +140,8 @@ const FilingCabinet: React.FC<{ currentLevel: GameLevel, onSelectLevel: (l: Game
                         <div className="absolute top-1/2 left-4 -translate-y-1/2 w-16 h-4 bg-[#111] rounded-sm shadow-[0_2px_2px_rgba(255,255,255,0.1)]"></div>
                         
                         {/* Label Card */}
-                        <div className="bg-[#f0e6d2] px-3 py-2 transform rotate-1 shadow-md border border-gray-400 ml-12 w-32 text-center">
+                        <div className="bg-[#f0e6d2] px-3 py-2 transform rotate-1 shadow-md border border-gray-400 ml-12 w-32 text-center flex items-center justify-center gap-2">
+                            <item.icon size={12} className="text-gray-600" />
                             <span className="font-typewriter text-xs font-bold text-black block">{item.label}</span>
                         </div>
                     </button>
@@ -174,10 +176,10 @@ const GameInterface: React.FC = () => {
   const [currentLevel, setCurrentLevel] = useState<GameLevel>(() => saved?.level ?? GameLevel.INTRO);
   const [levelTransition, setLevelTransition] = useState(false);
   const [introStarted, setIntroStarted] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Game States
   const [l1State, setL1State] = useState<InterrogationState>(() => saved?.l1State ?? { suspectStress: 0, resistance: 100, lastThought: "SUBJECT SILENT" });
+  const [cyberState, setCyberState] = useState<CyberState>(() => saved?.cyberState ?? { firewallIntegrity: 100, uploadSpeed: 0, statusMessage: "FIREWALL ACTIVE" });
   const [l2Credits, setL2Credits] = useState(() => saved?.l2Credits ?? 0);
   const [l2State, setL2State] = useState<MarketState>(() => saved?.l2State ?? { credits: 0, lastItem: '', lastOffer: 0, message: "AWAITING ASSET" });
   const [timeLeft, setTimeLeft] = useState(() => saved?.timeLeft ?? 60);
@@ -194,8 +196,8 @@ const GameInterface: React.FC = () => {
   useEffect(() => {
     // Don't save INTRO state, save LOBBY instead if currently in INTRO
     const levelToSave = currentLevel === GameLevel.INTRO ? GameLevel.LOBBY : currentLevel;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ level: levelToSave, l1State, l2Credits, l2State, l3State, timeLeft, wires }));
-  }, [currentLevel, l1State, l2Credits, l2State, l3State, timeLeft, wires]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ level: levelToSave, l1State, cyberState, l2Credits, l2State, l3State, timeLeft, wires }));
+  }, [currentLevel, l1State, cyberState, l2Credits, l2State, l3State, timeLeft, wires]);
 
   // Service Callbacks
   useEffect(() => {
@@ -208,6 +210,10 @@ const GameInterface: React.FC = () => {
     service.onInterrogationUpdate = (update) => {
         setL1State(update);
         if (update.resistance <= 0) handleLevelComplete();
+    };
+    service.onCyberUpdate = (update) => {
+        setCyberState(update);
+        if (update.firewallIntegrity <= 0) handleLevelComplete();
     };
     service.onMarketUpdate = (update) => {
         setL2State(update);
@@ -297,7 +303,14 @@ const GameInterface: React.FC = () => {
       setLevelTransition(true);
       setTimeout(() => {
           setLevelTransition(false);
-          const next = currentLevel === GameLevel.INTERROGATION ? GameLevel.MARKET : currentLevel === GameLevel.MARKET ? GameLevel.DEFUSAL : GameLevel.VICTORY;
+          let next;
+          switch (currentLevel) {
+              case GameLevel.INTERROGATION: next = GameLevel.CYBER; break;
+              case GameLevel.CYBER: next = GameLevel.MARKET; break;
+              case GameLevel.MARKET: next = GameLevel.DEFUSAL; break;
+              case GameLevel.DEFUSAL: next = GameLevel.VICTORY; break;
+              default: next = GameLevel.LOBBY;
+          }
           setCurrentLevel(next);
       }, 4000);
   };
@@ -340,20 +353,6 @@ const GameInterface: React.FC = () => {
           setLevelTransition(false);
           setCurrentLevel(level);
       }, 1000);
-  };
-
-  // Menu Handlers
-  const handleReplayIntro = async () => {
-      await service.disconnect();
-      setIntroStarted(false);
-      setCurrentLevel(GameLevel.INTRO);
-      setIsMenuOpen(false);
-  };
-
-  const handleAbortMission = async () => {
-      await service.disconnect();
-      localStorage.removeItem(STORAGE_KEY);
-      window.location.reload(); // Hard reset to ensure clean slate
   };
 
   useEffect(() => {
@@ -525,59 +524,19 @@ const GameInterface: React.FC = () => {
                     <span className="block text-xs text-gray-400 uppercase">Current Investigation</span>
                     <span className="text-xl font-bold">
                         {currentLevel === GameLevel.INTERROGATION && "SUBJECT: VEX"}
+                        {currentLevel === GameLevel.CYBER && "TARGET: MAINFRAME"}
                         {currentLevel === GameLevel.MARKET && "LOCATION: BLACK MARKET"}
                         {currentLevel === GameLevel.DEFUSAL && "DEVICE: EXPLOSIVE"}
                     </span>
                 </div>
             </div>
 
-            {/* STATUS & MENU */}
-            <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-                 <div className={clsx("px-3 py-1 font-bold font-stencil uppercase border shadow-lg transform rotate-2 hidden md:block", 
+            <div className="absolute top-4 right-4 z-30">
+                 <div className={clsx("px-3 py-1 font-bold font-stencil uppercase border shadow-lg transform rotate-2", 
                      isLive ? "bg-red-600 text-white border-red-800 animate-pulse" : "bg-gray-700 text-gray-400 border-gray-900")}>
                      {connectionState}
                  </div>
-                 
-                 <button 
-                    onClick={() => setIsMenuOpen(true)}
-                    className="bg-[#f0e6d2] text-black border-2 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all rounded-sm"
-                 >
-                     <MenuIcon size={24} />
-                 </button>
             </div>
-
-            {/* MENU OVERLAY */}
-            {isMenuOpen && (
-                <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-[#1a1c20] border-4 border-[#2d3036] p-8 max-w-md w-full relative shadow-2xl transform rotate-1">
-                         {/* Close X */}
-                         <button onClick={() => setIsMenuOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-                             <X size={24} />
-                         </button>
-
-                         <h2 className="text-3xl font-stencil text-red-600 mb-6 border-b border-gray-600 pb-2 tracking-widest text-center">CONFIDENTIAL</h2>
-                         
-                         <div className="space-y-4 font-typewriter">
-                             <button onClick={() => setIsMenuOpen(false)} className="w-full bg-[#f0e6d2] hover:bg-white text-black py-3 px-4 flex items-center justify-center gap-3 font-bold border-l-4 border-green-600 shadow-md transition-colors">
-                                 <Play size={18} /> RESUME OPERATION
-                             </button>
-                             
-                             <button onClick={handleReplayIntro} className="w-full bg-[#2a2c30] hover:bg-[#333] text-gray-300 hover:text-white py-3 px-4 flex items-center justify-center gap-3 border-l-4 border-yellow-600 shadow-md transition-colors">
-                                 <RotateCcw size={18} /> REVIEW EVIDENCE TAPE
-                             </button>
-                             
-                             <button onClick={handleAbortMission} className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 hover:text-red-200 py-3 px-4 flex items-center justify-center gap-3 border-l-4 border-red-600 shadow-md transition-colors mt-8">
-                                 <Power size={18} /> ABORT MISSION (RESET)
-                             </button>
-                         </div>
-
-                         <div className="mt-8 text-center text-xs text-gray-500 font-mono">
-                             AGENCY ID: 49-22-ALPHA<br/>
-                             AUTHORIZED PERSONNEL ONLY
-                         </div>
-                    </div>
-                </div>
-            )}
 
             {/* BOARD CONTENT AREA */}
             <div className="flex-1 relative w-full h-full overflow-hidden">
@@ -588,6 +547,7 @@ const GameInterface: React.FC = () => {
                          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,black_1px,transparent_1px)] bg-[length:4px_4px]"></div>
                          <strong className="block mb-1 text-red-900">OBJECTIVE:</strong>
                          {currentLevel === GameLevel.INTERROGATION && "Break suspect's resolve. Analyze voice/stress levels."}
+                         {currentLevel === GameLevel.CYBER && "Hack the mainframe. Show proof of humanity to the AI."}
                          {currentLevel === GameLevel.MARKET && "Present valuable items to camera for credit evaluation."}
                          {currentLevel === GameLevel.DEFUSAL && "Stabilize device. Cut colored wires per protocol."}
                     </div>
@@ -615,6 +575,11 @@ const GameInterface: React.FC = () => {
                                     <span className="text-red-400 font-bold">{caption.source === 'model' ? 'AGENCY' : 'YOU'}:</span> {caption.text}
                                 </div>
                             )}
+                            
+                             {/* Cyber Overlay Effect */}
+                             {currentLevel === GameLevel.CYBER && isLive && (
+                                <div className="absolute inset-0 pointer-events-none opacity-30 bg-[url('https://media.giphy.com/media/o0vwzuFxE43DnqrHAu/giphy.gif')] bg-cover mix-blend-screen"></div>
+                            )}
                         </div>
                     </Polaroid>
                 </div>
@@ -624,21 +589,20 @@ const GameInterface: React.FC = () => {
                      <div className="bg-[#fffde7] p-2 h-32 font-handwriting text-black relative flex flex-col justify-center items-center">
                         {currentLevel === GameLevel.INTERROGATION && (
                             <>
-                                <div className="w-full mb-2">
-                                    <div className="text-xs uppercase text-gray-500 flex justify-between">
-                                        <span>Stress</span>
-                                        <span>{l1State.suspectStress}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 h-2 mt-1"><div className="bg-red-800 h-full transition-all duration-500" style={{width: `${l1State.suspectStress}%`}}></div></div>
+                                <div className="text-xs uppercase text-gray-500">Stress Lvl</div>
+                                <div className="text-3xl font-bold font-typewriter">{l1State.suspectStress}%</div>
+                                <div className="w-full bg-gray-200 h-2 mt-1"><div className="bg-red-800 h-full" style={{width: `${l1State.suspectStress}%`}}></div></div>
+                                <div className="text-xs mt-2 italic">"{l1State.lastThought}"</div>
+                            </>
+                        )}
+                        {currentLevel === GameLevel.CYBER && (
+                            <>
+                                <div className="text-xs uppercase text-green-700 font-bold mb-1">FIREWALL</div>
+                                <div className="w-full bg-black h-4 border border-green-500 relative">
+                                    <div className="h-full bg-green-500 transition-all duration-300" style={{width: `${cyberState.firewallIntegrity}%`}}></div>
                                 </div>
-                                <div className="w-full mb-2">
-                                    <div className="text-xs uppercase text-gray-500 flex justify-between">
-                                        <span>Resistance</span>
-                                        <span>{l1State.resistance}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 h-2 mt-1"><div className="bg-blue-800 h-full transition-all duration-500" style={{width: `${l1State.resistance}%`}}></div></div>
-                                </div>
-                                <div className="text-xs mt-1 italic text-center w-full overflow-hidden text-ellipsis whitespace-nowrap">"{l1State.lastThought}"</div>
+                                <div className="text-2xl font-mono text-green-900 mt-1">{cyberState.firewallIntegrity}%</div>
+                                <div className="text-[10px] text-green-800 font-mono mt-2 animate-pulse">{cyberState.statusMessage}</div>
                             </>
                         )}
                         {currentLevel === GameLevel.MARKET && (

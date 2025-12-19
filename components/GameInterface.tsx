@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
 import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState, CyberState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
-import { Mic, Search, Skull, FileText, Lock, Radio, Play, FastForward, X, Cpu } from 'lucide-react';
+import { Mic, Search, Skull, FileText, Lock, Radio, Play, FastForward, X, Cpu, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 
 // AR Types
@@ -112,7 +112,7 @@ const Polaroid: React.FC<{
     </div>
 );
 
-const FilingCabinet: React.FC<{ currentLevel: GameLevel, onSelectLevel: (l: GameLevel) => void, isLive: boolean }> = ({ currentLevel, onSelectLevel, isLive }) => (
+const FilingCabinet: React.FC<{ currentLevel: GameLevel, onSelectLevel: (l: GameLevel) => void, isLive: boolean, onReset: () => void }> = ({ currentLevel, onSelectLevel, isLive, onReset }) => (
     <div className="h-full w-full bg-[#1a1c20] border-r-4 border-[#0f1114] flex flex-col p-4 shadow-2xl relative z-30">
         <div className="mb-8 border-b border-gray-700 pb-4">
             <h1 className="text-gray-400 font-stencil text-2xl tracking-widest leading-none">AGENCY</h1>
@@ -152,9 +152,18 @@ const FilingCabinet: React.FC<{ currentLevel: GameLevel, onSelectLevel: (l: Game
             ))}
         </div>
 
-        <div className="mt-auto text-center opacity-30 font-typewriter text-xs text-white">
-            <p>CONFIDENTIAL</p>
-            <p>DO NOT REMOVE</p>
+        <div className="mt-auto space-y-4">
+             <button 
+                onClick={onReset}
+                className="w-full py-2 bg-red-900/50 text-red-400 font-typewriter text-xs border border-red-900 hover:bg-red-900 hover:text-white transition-colors flex items-center justify-center gap-2"
+             >
+                <RotateCcw size={12} /> RESET DATA
+             </button>
+             
+             <div className="text-center opacity-30 font-typewriter text-xs text-white">
+                <p>CONFIDENTIAL</p>
+                <p>DO NOT REMOVE</p>
+            </div>
         </div>
     </div>
 );
@@ -335,24 +344,33 @@ const GameInterface: React.FC = () => {
   const handleStartIntro = () => {
       setIntroStarted(true);
       if (introVideoRef.current) {
-          introVideoRef.current.play().catch(e => console.error("Video play failed", e));
+          introVideoRef.current.muted = false;
+          const playPromise = introVideoRef.current.play();
+          if (playPromise !== undefined) {
+             playPromise.catch(e => {
+                 console.error("Video play failed (likely blocked)", e);
+                 // If autoplay fails, we stay in 'introStarted' but maybe show a manual fallback?
+                 // Or we can just let the user skip.
+             });
+          }
       }
   };
 
   const handleLevelSelect = async (level: GameLevel) => {
       if (currentLevel === level) return;
-      
-      // Ensure we disconnect cleanly before switching levels
       if (connectionState === ConnectionState.CONNECTED || connectionState === ConnectionState.CONNECTING) {
           await service.disconnect();
       }
-      
-      // Simple transition effect
       setLevelTransition(true);
       setTimeout(() => {
           setLevelTransition(false);
           setCurrentLevel(level);
       }, 1000);
+  };
+  
+  const handleReset = () => {
+      localStorage.removeItem(STORAGE_KEY);
+      window.location.reload();
   };
 
   useEffect(() => {
@@ -368,10 +386,24 @@ const GameInterface: React.FC = () => {
   // 0. INTRO VIDEO LEVEL
   if (currentLevel === GameLevel.INTRO) {
       return (
-          <div className="h-screen w-screen bg-black flex flex-col items-center justify-center relative overflow-hidden z-50">
+          <div className="h-[100dvh] w-screen bg-black flex flex-col items-center justify-center relative overflow-hidden z-50">
               
+              {/* Video Layer - Z-0 */}
+              <video 
+                  ref={introVideoRef}
+                  src={INTRO_VIDEO_URL}
+                  className="absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-1000"
+                  style={{ 
+                    filter: 'grayscale(100%) contrast(120%) sepia(30%)',
+                    opacity: introStarted ? 1 : 0.4
+                  }}
+                  playsInline
+                  onEnded={() => setCurrentLevel(GameLevel.LOBBY)}
+              />
+
+              {/* Start Overlay - Z-50 */}
               {!introStarted && (
-                   <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                   <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                        <button 
                            onClick={handleStartIntro}
                            className="group relative px-8 py-4 bg-[#f0e6d2] text-black font-typewriter font-bold text-xl border-2 border-dashed border-red-800 shadow-[0_0_30px_rgba(255,0,0,0.2)] hover:scale-105 transition-transform"
@@ -383,32 +415,18 @@ const GameInterface: React.FC = () => {
                        </button>
                    </div>
               )}
-
-              {/* Enhanced Video Player with Noir Filter */}
-              <video 
-                  ref={introVideoRef}
-                  src={INTRO_VIDEO_URL}
-                  className="absolute inset-0 w-full h-full object-cover opacity-90 transition-opacity duration-1000"
-                  style={{ filter: 'grayscale(100%) contrast(120%) sepia(30%)' }}
-                  playsInline
-                  onEnded={() => setCurrentLevel(GameLevel.LOBBY)}
-              />
               
-              {/* Old Film Overlay Effects */}
-              <div className="absolute inset-0 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')] opacity-20 mix-blend-overlay"></div>
-              <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_black]"></div>
+              {/* Overlay Effects - Z-10 */}
+              <div className="absolute inset-0 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')] opacity-20 mix-blend-overlay z-10"></div>
+              <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_black] z-10"></div>
               
-              {/* "Projector" flicker effect */}
-              {introStarted && (
-                  <div className="absolute inset-0 pointer-events-none bg-white opacity-[0.02] animate-pulse"></div>
-              )}
-
+              {/* Skip Button - Z-50 */}
               {introStarted && (
                   <button 
                     onClick={() => setCurrentLevel(GameLevel.LOBBY)}
                     className="absolute bottom-8 right-8 z-50 group"
                   >
-                     <div className="bg-red-900/90 text-[#f0e6d2] font-stencil border-2 border-[#f0e6d2] px-6 py-3 transform -rotate-6 mask-grunge hover:scale-110 transition-transform shadow-lg">
+                     <div className="bg-red-900/90 text-[#f0e6d2] font-stencil border-2 border-[#f0e6d2] px-6 py-3 transform -rotate-6 mask-grunge hover:scale-110 transition-transform shadow-lg cursor-pointer">
                         <span className="flex items-center gap-2">
                            SKIP EVIDENCE <FastForward size={18} />
                         </span>
@@ -421,13 +439,12 @@ const GameInterface: React.FC = () => {
 
   if (currentLevel === GameLevel.LOBBY) {
       return (
-          <div className="h-screen w-screen overflow-hidden flex bg-[#0f1114]">
-             <FilingCabinet currentLevel={currentLevel} onSelectLevel={handleLevelSelect} isLive={false} />
+          <div className="h-[100dvh] w-screen overflow-hidden flex bg-[#0f1114]">
+             <FilingCabinet currentLevel={currentLevel} onSelectLevel={handleLevelSelect} isLive={false} onReset={handleReset} />
              <div className="flex-1 relative">
                  <PegboardBackground />
                  <SpotlightOverlay />
                  
-                 {/* Decorative Red Strings */}
                  <RedStringWeb points={[
                      { x1: "50%", y1: "50%", x2: "20%", y2: "20%" },
                      { x1: "50%", y1: "50%", x2: "80%", y2: "30%" },
@@ -441,7 +458,6 @@ const GameInterface: React.FC = () => {
                      <p className="font-typewriter text-sm mt-2 text-gray-300 max-w-md">Beritahu kami apa yang sebenarnya terjadi?</p>
                  </div>
 
-                 {/* Center Main Photo (Intro) */}
                  <Polaroid 
                     title="START INVESTIGATION" 
                     caption="Click to open case file"
@@ -456,7 +472,6 @@ const GameInterface: React.FC = () => {
                      </div>
                  </Polaroid>
                  
-                 {/* Floating hints */}
                  <Polaroid rotate={5} className="top-[20%] left-[20%] w-48" caption="Suspect: Vex">
                      <div className="w-full h-full bg-gray-800"></div>
                  </Polaroid>
@@ -468,7 +483,6 @@ const GameInterface: React.FC = () => {
                      who is he?
                  </div>
                  
-                 {/* Desk Surface at bottom */}
                  <div className="absolute bottom-0 left-0 w-full h-12 bg-[#2a2018] border-t-4 border-[#1a120c] shadow-[0_-5px_10px_rgba(0,0,0,0.8)] z-40"></div>
              </div>
           </div>
@@ -477,7 +491,7 @@ const GameInterface: React.FC = () => {
 
   if (levelTransition) {
       return (
-          <div className="h-screen bg-black flex items-center justify-center font-typewriter text-white">
+          <div className="h-[100dvh] bg-black flex items-center justify-center font-typewriter text-white">
               <span className="animate-pulse text-2xl">LOADING NEXT EVIDENCE...</span>
           </div>
       );
@@ -485,7 +499,7 @@ const GameInterface: React.FC = () => {
 
   if (currentLevel === GameLevel.VICTORY) {
       return (
-          <div className="h-screen w-screen overflow-hidden flex bg-[#0f1114] items-center justify-center relative">
+          <div className="h-[100dvh] w-screen overflow-hidden flex bg-[#0f1114] items-center justify-center relative">
                <PegboardBackground />
                <div className="z-20 text-center bg-[#fdfbf7] p-10 transform rotate-1 shadow-2xl max-w-lg">
                    <h1 className="font-stencil text-4xl text-green-900 mb-4 border-b-2 border-black pb-2">CASE CLOSED</h1>
@@ -500,10 +514,10 @@ const GameInterface: React.FC = () => {
 
   // GAMEPLAY LAYOUT
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-[#0f1114]">
+    <div className="h-[100dvh] w-screen overflow-hidden flex bg-[#0f1114]">
         {/* SIDEBAR (Filing Cabinet) */}
         <div className="w-20 md:w-64 flex-shrink-0 z-40">
-            <FilingCabinet currentLevel={currentLevel} onSelectLevel={handleLevelSelect} isLive={isLive} />
+            <FilingCabinet currentLevel={currentLevel} onSelectLevel={handleLevelSelect} isLive={isLive} onReset={handleReset} />
         </div>
 
         {/* MAIN BOARD */}
@@ -511,7 +525,6 @@ const GameInterface: React.FC = () => {
             <PegboardBackground />
             <SpotlightOverlay />
             
-            {/* Connection Strings based on fixed layout positions */}
             <RedStringWeb points={[
                 { x1: "50%", y1: "50%", x2: "80%", y2: "25%" }, // Main to Stats
                 { x1: "50%", y1: "50%", x2: "80%", y2: "70%" }, // Main to Audio
@@ -560,7 +573,6 @@ const GameInterface: React.FC = () => {
                             <video ref={videoRef} className={clsx("w-full h-full object-cover", currentLevel === GameLevel.DEFUSAL ? "opacity-0" : "opacity-90")} muted playsInline />
                             <canvas ref={canvasRef} className={clsx("absolute inset-0 w-full h-full object-cover", currentLevel === GameLevel.DEFUSAL ? "opacity-100" : "opacity-0")} />
                             
-                            {/* Connect Button Overlay */}
                             {!isLive && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                                     <button onClick={connectToLevel} className="bg-red-800 text-white font-stencil px-6 py-3 hover:bg-red-700 border-2 border-white/20 shadow-xl tracking-widest">
@@ -569,14 +581,12 @@ const GameInterface: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Caption Subtitles */}
                             {caption && (
                                 <div className="absolute bottom-2 left-2 right-2 bg-black/70 p-2 text-white font-typewriter text-sm border-l-2 border-red-500">
                                     <span className="text-red-400 font-bold">{caption.source === 'model' ? 'AGENCY' : 'YOU'}:</span> {caption.text}
                                 </div>
                             )}
                             
-                             {/* Cyber Overlay Effect */}
                              {currentLevel === GameLevel.CYBER && isLive && (
                                 <div className="absolute inset-0 pointer-events-none opacity-30 bg-[url('https://media.giphy.com/media/o0vwzuFxE43DnqrHAu/giphy.gif')] bg-cover mix-blend-screen"></div>
                             )}
@@ -643,7 +653,6 @@ const GameInterface: React.FC = () => {
             {/* DESK SURFACE (Bottom) */}
             <div className="h-16 w-full bg-[#2a2018] border-t-4 border-[#1a120c] relative z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] flex items-center px-8 justify-between">
                 <div className="text-[#8a7058] font-stencil text-xl tracking-widest opacity-50">EVIDENCE TABLE</div>
-                {/* Interactive props could go here */}
                 <div className="flex gap-4">
                     <div className="w-24 h-2 bg-gray-700 rounded-full opacity-20"></div>
                     <div className="w-8 h-8 rounded-full bg-gray-700 opacity-20"></div>

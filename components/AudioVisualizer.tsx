@@ -1,34 +1,36 @@
+
 import React, { useEffect, useState } from 'react';
 
-// A simulated visualizer since we can't easily tap into the raw PCM output stream 
-// from the service without complex piping. It creates a "listening/thinking" effect.
 interface AudioVisualizerProps {
   isActive: boolean;
 }
 
 const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isActive }) => {
-  const [bars, setBars] = useState<number[]>(new Array(10).fill(10));
+  const [bars, setBars] = useState<number[]>(new Array(30).fill(10));
 
   useEffect(() => {
     if (!isActive) {
-        setBars(new Array(10).fill(5));
+        setBars(new Array(30).fill(5));
         return;
     }
 
     const interval = setInterval(() => {
-      setBars(prev => prev.map(() => Math.random() * 80 + 10));
-    }, 100);
+      setBars(prev => prev.map(() => Math.random() * 90 + 5));
+    }, 60);
 
     return () => clearInterval(interval);
   }, [isActive]);
 
   return (
-    <div className="flex items-center justify-center gap-1 h-12 w-full">
+    <div className="flex items-center justify-center gap-[2px] h-8 w-64">
       {bars.map((height, i) => (
         <div
           key={i}
-          className="w-2 bg-red-500 rounded-sm transition-all duration-100 ease-in-out shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-          style={{ height: `${height}%` }}
+          className="w-[3px] bg-red-600 rounded-full transition-all duration-75 ease-in-out shadow-[0_0_5px_rgba(255,0,0,0.5)]"
+          style={{ 
+            height: `${height}%`,
+            opacity: isActive ? 0.3 + (height / 120) : 0.1
+          }}
         />
       ))}
     </div>

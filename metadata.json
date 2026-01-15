@@ -1,6 +1,6 @@
 {
   "name": "Chronicles of the Unspoken",
-  "description": "A 3-stage sci-fi narrative campaign driven by your voice and camera. Interrogate suspects, trade in black markets, and defuse bombs using Gemini 2.5.",
+  "description": "Uma campanha narrativa de ficção científica em 5 estágios movida por voz e câmera. Interrogue suspeitos, negocie no mercado negro e desarme bombas usando a inteligência multimodal do Gemini 2.5 em tempo real.",
   "requestFramePermissions": [
     "camera",
     "microphone"

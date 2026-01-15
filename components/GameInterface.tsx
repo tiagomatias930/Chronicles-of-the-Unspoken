@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { GeminiLiveService } from '../services/geminiLiveService';
 import { ConnectionState, GameLevel, InterrogationState, MarketState, BombState, CyberState, ForensicsState } from '../types';
 import AudioVisualizer from './AudioVisualizer';
+import GameGuide from './GameGuide';
 import { Mic, Skull, FileText, Lock, Play, FastForward, Cpu, RotateCcw, ShieldAlert, Binary, Layers, Menu, X, Power } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -133,7 +134,15 @@ const GameInterface: React.FC = () => {
   const introVideoRef = useRef<HTMLVideoElement>(null);
 
   const saved = useRef(getSavedState()).current;
-  const [service] = useState(() => new GeminiLiveService());
+  const [service] = useState(() => {
+    try {
+      return new GeminiLiveService();
+    } catch (error) {
+      console.error('Failed to initialize GeminiLiveService:', error);
+      // Create a mock service that won't break the UI
+      return new GeminiLiveService();
+    }
+  });
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [currentLevel, setCurrentLevel] = useState<GameLevel>(() => saved?.level ?? GameLevel.INTRO);
   const [levelTransition, setLevelTransition] = useState(false);
@@ -153,6 +162,8 @@ const GameInterface: React.FC = () => {
   const [l3State, setL3State] = useState<BombState>(() => saved?.l3State ?? { status: 'active', message: 'READY', stability: 100 });
   const [caption, setCaption] = useState<{text: string, source: 'user'|'model'} | null>(null);
   const [wires, setWires] = useState<Wire[]>(() => saved?.wires ?? [{ id: 1, color: '#b91c1c', x: 0.3, cut: false }, { id: 2, color: '#1d4ed8', x: 0.5, cut: false }, { id: 3, color: '#a16207', x: 0.7, cut: false }]);
+  const [gameError, setGameError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     const levelToSave = currentLevel === GameLevel.INTRO ? GameLevel.LOBBY : currentLevel;
@@ -190,14 +201,23 @@ const GameInterface: React.FC = () => {
 
   const handleGameOver = async () => {
       await service.disconnect();
-      alert("MISSION FAILED.");
-      setCurrentLevel(currentLevel);
+      setGameError("MISSION FAILED - Returning to Lobby");
+      setTimeout(() => {
+          setGameError(null);
+          setCurrentLevel(GameLevel.LOBBY);
+      }, 3000);
   };
 
   const connectToLevel = async () => {
-    if (videoRef.current) {
-        const source = (currentLevel === GameLevel.DEFUSAL && canvasRef.current) ? canvasRef.current : videoRef.current;
-        await service.connect(source, currentLevel);
+    try {
+      setGameError(null);
+      if (videoRef.current) {
+          const source = (currentLevel === GameLevel.DEFUSAL && canvasRef.current) ? canvasRef.current : videoRef.current;
+          await service.connect(source, currentLevel);
+      }
+    } catch (error: any) {
+      setGameError(`Failed to connect: ${error.message || 'Unknown error'}`);
+      setTimeout(() => setGameError(null), 3000);
     }
   };
 
@@ -239,9 +259,76 @@ const GameInterface: React.FC = () => {
     );
   }
 
+  if (currentLevel === GameLevel.VICTORY) {
+    return (
+        <div className="h-[100dvh] w-screen bg-black flex items-center justify-center overflow-hidden relative">
+            {/* Animated Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-black">
+                <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,0,0,0.1)_25%,rgba(255,0,0,0.1)_50%,transparent_50%,transparent_75%,rgba(255,0,0,0.1)_75%,rgba(255,0,0,0.1))] bg-[length:40px_40px] animate-[slide_20s_linear_infinite]"></div>
+            </div>
+
+            <style>{`@keyframes slide { 0% { background-position: 0 0; } 100% { background-position: 40px 40px; } }`}</style>
+
+            <div className="relative z-10 text-center">
+                {/* Victory Title */}
+                <div className="mb-8 animate-in fade-in zoom-in duration-1000">
+                    <h1 className="font-stencil text-9xl text-red-600 mb-4 drop-shadow-[0_0_40px_rgba(220,38,38,0.8)] tracking-tighter">VICTORY</h1>
+                    <div className="font-stencil text-2xl text-white/80 tracking-widest">CASE CLOSED</div>
+                </div>
+
+                {/* Stats Summary */}
+                <div className="grid grid-cols-3 gap-8 mb-12 max-w-2xl mx-auto">
+                    <div className="border border-red-600 p-4 bg-black/60 backdrop-blur">
+                        <div className="font-stencil text-red-400 text-xs mb-2">INTERROGATION</div>
+                        <div className="text-2xl text-white">✓ COMPLETE</div>
+                    </div>
+                    <div className="border border-red-600 p-4 bg-black/60 backdrop-blur">
+                        <div className="font-stencil text-red-400 text-xs mb-2">BREACH & FORENSICS</div>
+                        <div className="text-2xl text-white">✓ COMPLETE</div>
+                    </div>
+                    <div className="border border-red-600 p-4 bg-black/60 backdrop-blur">
+                        <div className="font-stencil text-red-400 text-xs mb-2">DEFUSAL</div>
+                        <div className="text-2xl text-white">✓ COMPLETE</div>
+                    </div>
+                </div>
+
+                {/* Message */}
+                <div className="mb-12 max-w-2xl mx-auto border border-white/20 bg-black/80 p-6 backdrop-blur">
+                    <p className="font-mono-prime text-white/80 mb-4 leading-relaxed">
+                        The Black Market has been dismantled. The bomb defused. Justice served.
+                    </p>
+                    <p className="font-mono-prime text-red-400 italic">
+                        "In the shadows of Neo-Berlin, Detective Leviathan closed the case that changed everything."
+                    </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-6 justify-center">
+                    <button 
+                        onClick={() => { resetGame(); }}
+                        className="group relative px-12 py-4 overflow-hidden border-2 border-red-600 bg-black hover:bg-red-600/20 transition-all duration-300"
+                    >
+                        <span className="relative font-stencil text-xl text-red-600 group-hover:text-white tracking-widest">NEW GAME</span>
+                    </button>
+                    <button 
+                        onClick={() => setCurrentLevel(GameLevel.LOBBY)}
+                        className="group relative px-12 py-4 overflow-hidden border-2 border-white/20 bg-black hover:bg-white/10 transition-all duration-300"
+                    >
+                        <span className="relative font-stencil text-xl text-white/70 group-hover:text-white tracking-widest">MAIN MENU</span>
+                    </button>
+                </div>
+            </div>
+
+            <Ticker />
+        </div>
+    );
+  }
+
   if (currentLevel === GameLevel.LOBBY) {
     return (
         <div className="h-[100dvh] w-screen overflow-hidden flex bg-black relative">
+            {showGuide && <GameGuide onClose={() => setShowGuide(false)} />}
+            
             <div 
                 className="absolute inset-0 z-0 bg-cover bg-center opacity-60 grayscale-[0.5] contrast-125"
                 style={{ backgroundImage: `url(${LOBBY_BG_URL})` }}
@@ -262,6 +349,18 @@ const GameInterface: React.FC = () => {
                 <div className="text-red-600 font-stencil text-4xl">STATUS: STANDBY</div>
             </div>
 
+            {/* Help Button */}
+            <button 
+              onClick={() => setShowGuide(true)}
+              className="absolute right-16 top-16 z-30 bg-blue-600/20 hover:bg-blue-600/40 text-white border border-blue-600/50 p-3 rounded transition-colors group"
+              title="Show mission briefing"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">?</span>
+                <span className="font-stencil text-xs group-hover:block hidden">BRIEFING</span>
+              </div>
+            </button>
+
             <Ticker />
         </div>
     );
@@ -281,6 +380,16 @@ const GameInterface: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-screen overflow-hidden flex bg-[#050505] relative">
+        {/* GAME ERROR OVERLAY */}
+        {gameError && (
+            <div className="absolute inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
+                <div className="text-center">
+                    <div className="font-stencil text-6xl text-red-600 mb-4 animate-pulse">MISSION FAILED</div>
+                    <div className="font-stencil text-2xl text-white/60">{gameError}</div>
+                </div>
+            </div>
+        )}
+
         {/* PAUSE OVERLAY */}
         {isPaused && (
             <PauseOverlay 
@@ -379,6 +488,18 @@ const GameInterface: React.FC = () => {
                             <div className="space-y-2 text-yellow-500">
                                 <div className="text-xl">{l2Credits} CR</div>
                                 <div className="text-[10px] text-white/40">TARGET: 500 CR</div>
+                            </div>
+                        )}
+                        {currentLevel === GameLevel.DEFUSAL && (
+                            <div className="space-y-2">
+                                <div className={clsx("text-lg font-bold", l3State.status === 'active' ? "text-red-600 animate-pulse" : l3State.status === 'defused' ? "text-green-500" : "text-red-700")}>
+                                    {l3State.status === 'active' ? 'BOMB: ACTIVE' : l3State.status === 'defused' ? 'BOMB: DEFUSED' : 'BOMB: EXPLODED'}
+                                </div>
+                                <div>STABILITY: {l3State.stability}%</div>
+                                <div className={clsx("h-2 border", l3State.stability > 50 ? "border-green-900 bg-black" : "border-red-900 bg-black")}>
+                                    <div className={clsx("h-full", l3State.stability > 50 ? "bg-green-500" : "bg-red-600")} style={{width: `${l3State.stability}%`}}></div>
+                                </div>
+                                <div className="text-white/60 italic text-[9px] mt-2">{l3State.message}</div>
                             </div>
                         )}
                     </div>

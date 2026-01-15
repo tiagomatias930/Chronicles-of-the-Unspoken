@@ -101,7 +101,17 @@ export class GeminiLiveService {
   public onBombUpdate: (state: BombState) => void = () => {};
 
   constructor() {
-    this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn(
+        'VITE_GEMINI_API_KEY environment variable is not set. ' +
+        'Please set it in your .env.local file for development or in Vercel environment variables for production.'
+      );
+      // Use a placeholder to allow app to load
+      this.client = new GoogleGenAI({ apiKey: 'placeholder-key' });
+    } else {
+      this.client = new GoogleGenAI({ apiKey });
+    }
   }
 
   async connect(sourceElement: HTMLVideoElement | HTMLCanvasElement, level: GameLevel) {

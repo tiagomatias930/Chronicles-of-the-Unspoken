@@ -1,5 +1,5 @@
 import React, { ErrorInfo, ReactNode, Suspense } from 'react';
-import TestGameInterface from './components/TestGameInterface';
+import GameInterface from './components/GameInterface';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -61,7 +61,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
         <div className="antialiased text-gray-100 h-screen w-screen overflow-hidden">
-          <TestGameInterface />
+          <GameInterface />
         </div>
       </Suspense>
     </ErrorBoundary>

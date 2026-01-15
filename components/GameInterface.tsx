@@ -317,6 +317,15 @@ const GameInterface: React.FC = () => {
     );
   };
 
+  useEffect(() => {
+    if (introStep === 'decrypting') {
+        const timer = setTimeout(() => {
+            switchLevel(GameLevel.INTERROGATION);
+        }, 2000);
+        return () => clearTimeout(timer);
+    }
+  }, [introStep]);
+
   if (currentLevel === GameLevel.INTRO) {
     return (
         <div className="h-screen w-screen bg-black flex items-center justify-center relative font-mono-prime overflow-hidden">
@@ -353,7 +362,6 @@ const GameInterface: React.FC = () => {
                              <div className="absolute h-full bg-red-600 w-1/2 animate-[progress_1.2s_infinite]" />
                         </div>
                     </div>
-                    {setTimeout(() => switchLevel(GameLevel.INTERROGATION), 2000) && null}
                 </div>
             )}
             

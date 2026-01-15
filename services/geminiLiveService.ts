@@ -104,7 +104,10 @@ export class GeminiLiveService {
     try {
       this.onStateChange(ConnectionState.CONNECTING);
       
-      this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not found in environment variables");
+      
+      this.client = new GoogleGenAI({ apiKey });
 
       const systemInstruction = getInstruction(level, lang);
       let tools: any[] = [];

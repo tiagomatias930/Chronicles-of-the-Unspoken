@@ -1,33 +1,36 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
 @layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-black text-gray-100 font-mono-prime overflow-hidden;
+    @apply bg-black text-white;
   }
 }
 
 @layer components {
-  .font-typewriter {
-    @apply font-typewriter;
-  }
-  
-  .font-mono-prime {
-    @apply font-mono-prime;
-  }
-  
   .font-stencil {
-    @apply font-stencil;
+    font-family: 'Black Ops One', cursive;
   }
-  
-  .noise-overlay {
-    @apply fixed top-0 left-0 w-full h-full pointer-events-none z-100;
-    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAA5OTkAAABMTExERERmZmYzMzPMzMxmoqMDAAAAB3RSTlMABVDlKCn/KoNlGAAAAQlJREFUeJxt0cFqwzAMRlG7l9C66K5Q8iT//69S2w5KMSYJc48OwvDxEfr5/Xp9fX59/f25/n79/P6+Xj//fP5+/Xz/fr1+vX59v3+9fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fgH0sKx4q9k+ZwAAAABJRU5ErkJggg==');
-    @apply opacity-5;
+
+  .font-mono-prime {
+    font-family: 'Courier Prime', monospace;
   }
 }
 
-.perspective-1200px {
-  perspective: 1200px;
+@layer utilities {
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(calc(-100% - 3rem));
+    }
+  }
+
+  .animate-marquee {
+    @apply animate-[marquee_20s_linear_infinite];
+  }
 }

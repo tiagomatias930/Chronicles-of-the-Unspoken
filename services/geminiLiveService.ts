@@ -104,10 +104,7 @@ export class GeminiLiveService {
     try {
       this.onStateChange(ConnectionState.CONNECTING);
       
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not found in environment variables");
-      
-      this.client = new GoogleGenAI({ apiKey });
+      this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       const systemInstruction = getInstruction(level, lang);
       let tools: any[] = [];
@@ -122,13 +119,26 @@ export class GeminiLiveService {
         default: throw new Error("Invalid Level selected for connection.");
       }
 
-      this.inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: INPUT_SAMPLE_RATE });
-      this.outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+      // Cross-browser AudioContext creation
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+          throw new Error("Web Audio API not supported in this browser.");
+      }
+
+      this.inputAudioContext = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
+      this.outputAudioContext = new AudioContextClass({ sampleRate: AUDIO_SAMPLE_RATE });
       this.outputNode = this.outputAudioContext.createGain();
-      this.pannerNode = this.outputAudioContext.createStereoPanner();
-      
-      this.outputNode.connect(this.pannerNode);
-      this.pannerNode.connect(this.outputAudioContext.destination);
+
+      // Safe creation of StereoPanner (it might not exist in older Safari)
+      if (this.outputAudioContext.createStereoPanner) {
+          this.pannerNode = this.outputAudioContext.createStereoPanner();
+          this.outputNode.connect(this.pannerNode);
+          this.pannerNode.connect(this.outputAudioContext.destination);
+      } else {
+          console.warn("StereoPannerNode not supported, audio spatialization disabled.");
+          this.pannerNode = null;
+          this.outputNode.connect(this.outputAudioContext.destination);
+      }
 
       if (existingStream) {
           this.stream = existingStream;
@@ -183,9 +193,9 @@ export class GeminiLiveService {
   }
 
   public setAudioPan(value: number) {
-    if (this.pannerNode) {
+    if (this.pannerNode && this.outputAudioContext) {
       // value should be -1 (left) to 1 (right)
-      this.pannerNode.pan.setTargetAtTime(value, this.outputAudioContext?.currentTime || 0, 0.1);
+      this.pannerNode.pan.setTargetAtTime(value, this.outputAudioContext.currentTime, 0.1);
     }
   }
 

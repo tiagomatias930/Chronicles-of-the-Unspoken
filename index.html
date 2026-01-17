@@ -5,9 +5,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Chronicles of the Unspoken</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:wght@400;700&family=Black+Ops+One&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #050505;
+        color: #dcdcdc;
+        font-family: 'Courier Prime', monospace;
+        overflow: hidden;
+      }
+      
+      .font-typewriter { font-family: 'Special Elite', cursive; }
+      .font-mono-prime { font-family: 'Courier Prime', monospace; }
+      .font-stencil { font-family: 'Black Ops One', cursive; }
+
+      .noise-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAA5OTkAAABMTExERERmZmYzMzPMzMxmoqMDAAAAB3RSTlMABVDlKCn/KoNlGAAAAQlJREFUeJxt0cFqwzAMRlG7l9C66K5Q8iT//69S2w5KMSYJc48OwvDxEfr5/Xp9fX59/f25/n79/P6+Xj//fP5+/Xz/fr1+vX59v3+9fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fr1+vX69fgH0sKx4q9k+ZwAAAABJRU5ErkJggg==');
+        opacity: 0.05;
+        z-index: 100;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -28,6 +53,5 @@
   <body>
     <div class="noise-overlay"></div>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

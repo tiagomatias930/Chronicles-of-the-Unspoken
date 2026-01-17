@@ -104,7 +104,7 @@ export class GeminiLiveService {
     try {
       this.onStateChange(ConnectionState.CONNECTING);
       
-      this.client = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      this.client = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
 
       const systemInstruction = getInstruction(level, lang);
       let tools: any[] = [];

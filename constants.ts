@@ -1,5 +1,5 @@
 
-export const GEMINI_MODEL = 'gemini-3-pro-preview';
+export const GEMINI_MODEL = 'gemini-2.5-flash-preview';
 export const AUDIO_SAMPLE_RATE = 24000;
 export const INPUT_SAMPLE_RATE = 16000;
 
